@@ -57,6 +57,13 @@ Difficulte.TRES_DIFFICILE = Difficulte(-1, 4, 'très difficile', 'tres difficile
 Difficulte.IMPOSSIBLE = Difficulte(-1, 6, 'impossible', 'impo')
 Difficulte.HEROIQUE = Difficulte(-1, 8, 'héroïque', 'héroique', 'heroïque', 'heroique')
 
+def _try_int(v):
+    try:
+        int(v)
+        return True
+    except ValueError:
+        return False        
+
 MENTION_PATTERN = re.compile(r'^<@!\d+>$')
 def parse_jet(le_perso, tokens):
     poubelle = []
@@ -67,6 +74,13 @@ def parse_jet(le_perso, tokens):
     for t in tokens:
         t = t.lower()
         if MENTION_PATTERN.match(t):
+            sign = 1
+        elif _try_int(t):
+            i = int(t)
+            if i < 0:
+                scores.append((-1, perso.Ref(abs(i), t)))
+            else:
+                scores.append((sign, perso.Ref(i, t)))
             sign = 1
         elif t == 'b' or t == 'bonus':
             bonus += 1
@@ -83,11 +97,10 @@ def parse_jet(le_perso, tokens):
             scores.append((d.sign, perso.Ref(d.mod, d.name)))
             sign = 1
         elif t in le_perso.ref_map:
-            try:
-                ref = le_perso.ref_map[t]
-                int(ref.value)
+            ref = le_perso.ref_map[t]
+            if _try_int(ref.value):
                 scores.append((sign, ref))
-            except ValueError:
+            else:
                 poubelle.append(t)
             sign = 1
         elif t in le_perso.avantages.value:
