@@ -50,6 +50,18 @@ def get_user(message):
         return message.mentions[0]
     return None
 
+def get_perso(message):
+    result = []
+    for p in perso.TOUS.values():
+        if p.nom.value in message.content:
+            result.append((None, p))
+    for user in message.mentions:
+        if user.id in perso.PJ:
+            result.append((user, perso.PJ[user.id]))
+    if len(result) == 0 and message.author.id in perso.PJ:
+        result.append((message.author, perso.PJ[message.author.id]))
+    return result
+
 def str_sign(n):
     if n == 1:
         return '+'
@@ -70,10 +82,18 @@ async def on_message(message):
         await message.channel.delete_messages(MESSAGE_QUEUE)
         MESSAGE_QUEUE = []
     elif message.content.startswith('fdp'):
-        user = get_user(message)
-        if user is not None and user.id in perso.PJ:
-            reply = await message.channel.send(f'Fiche de perso de {user.mention}\n{perso.PJ[user.id].fiche()}')
-            MESSAGE_QUEUE.extend([message, reply])
+        MESSAGE_QUEUE.append(message)
+        persos = get_perso(message)
+        for user, p in persos:
+            if user is None:
+                label = f'**{p.nom}**'
+            else:
+                label = f'**{p.nom}** ({user.mention})'
+            reply = await message.channel.send(f'Fiche de perso de {label}\n{p.fiche()}')
+            MESSAGE_QUEUE.append(reply)
+        if len(persos) == 0:
+            reply = await message.channel.send(f'Qui?')
+            MESSAGE_QUEUE.append(reply)
     elif message.content.startswith('jet'):
         user = get_user(message)
         if user is not None and user.id in perso.PJ:
