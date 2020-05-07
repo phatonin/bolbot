@@ -10,25 +10,14 @@ import re
 import os
 import os.path
 
-
-PJ = {}
-TOUS = {}
-
-def load(path, pj=False):
-    print (path)
-    print (os.path.isfile(path))
+def load(path):
     if os.path.isdir(path):
         for fn in os.listdir(path):
-            load(os.path.join(path, fn), pj)
+            yield from load(os.path.join(path, fn))
     elif os.path.isfile(path) and path.endswith('.fdp'):
-        print ('perso: ' + path)
         p = Perso()
         p.parse_file(path)
-        if pj:
-            print ('PJ!')
-            p.niveau = Niveau.PJ
-            userid = int(os.path.basename(path)[:-4])
-            PJ[userid] = p
+        yield p, path
 
 class Ref:
     def __init__(self, value, name=None):
@@ -44,21 +33,6 @@ class Ref:
     def __isub__(self, other):
         self.value -= other
 
-class RefNom(Ref):
-    def __init__(self, value, perso):
-        Ref.__init__(self, value)
-        self.perso = perso
-        
-    def __setattr__(self, name, value):
-        if name != 'value':
-            Ref.__setattr__(self, name, value)
-            return
-        if hasattr(self, 'value') and self.value is not None:
-            del TOUS[self.value]
-        Ref.__setattr__(self, name, value)
-        if value is not None:
-            TOUS[value.lower()] = self.perso
-
 class Niveau:
     def __init__(self, name):
         self.name = name
@@ -71,7 +45,7 @@ class Perso:
     LINE_PATTERN = re.compile(r'(?P<k>\w+)\s*[:=]?\s*(?P<v>.+)', re.RegexFlag.IGNORECASE)
     def __init__(self):
         self.niveau = Ref(None)
-        self.nom = RefNom(None, self)
+        self.nom = Ref(None)
         self.origine = Ref(None)
         self.langues = Ref([])
         self.attributs = Attributs()
