@@ -2,3 +2,4 @@
 .project
 .pydevproject
 *.fdp
+__pycache__
