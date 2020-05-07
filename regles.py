@@ -109,8 +109,11 @@ def parse_jet(le_perso, tokens):
         elif t in le_perso.desavantages.value:
             malus += 1
             sign = 1
+        elif t in perso.TOUS:
+            sign = 1
         else:
             poubelle.append(t)
+            sign = 1
     return scores, bonus, malus, poubelle
 
 def jet(le_perso, tokens):

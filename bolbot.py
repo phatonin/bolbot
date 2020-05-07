@@ -43,18 +43,11 @@ DIGITS = ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight'
 def dice_icons(dice):
     return ' '.join(f':{DIGITS[n]}:' for n in dice)
 
-def get_user(message):
-    if len(message.mentions) == 0:
-        return message.author
-    if len(message.mentions) == 1:
-        return message.mentions[0]
-    return None
-
 def get_perso(message):
     result = []
-    for p in perso.TOUS.values():
-        if p.nom.value in message.content:
-            result.append((None, p))
+    for t in message.content.lower().split():
+        if t in perso.TOUS:
+            result.append((None, perso.TOUS[t]))
     for user in message.mentions:
         if user.id in perso.PJ:
             result.append((user, perso.PJ[user.id]))
@@ -67,6 +60,12 @@ def str_sign(n):
         return '+'
     if n == -1:
         return '-'
+    
+def perso_label(p, user):
+    if user is None:
+        return f'**{p.nom}**'
+    return f'**{p.nom}** ({user.mention})'
+    
 @client.event
 async def on_message(message):
     global MESSAGE_QUEUE
@@ -74,7 +73,7 @@ async def on_message(message):
         return
     r = parse_des(message.content)
     if r is not None:
-        dice, sorted_dice, result = regles.lance(**r)
+        dice, _, result = regles.lance(**r)
         reply = await message.channel.send(f'{message.author.mention} lance `{message.content}`\n{dice_icons(dice)}\n**{result}**')
         MESSAGE_QUEUE.extend([message, reply])
     elif message.content == 'purge':
@@ -85,23 +84,23 @@ async def on_message(message):
         MESSAGE_QUEUE.append(message)
         persos = get_perso(message)
         for user, p in persos:
-            if user is None:
-                label = f'**{p.nom}**'
-            else:
-                label = f'**{p.nom}** ({user.mention})'
-            reply = await message.channel.send(f'Fiche de perso de {label}\n{p.fiche()}')
+            reply = await message.channel.send(f'Fiche de perso de {perso_label(p, user)}\n{p.fiche()}')
             MESSAGE_QUEUE.append(reply)
         if len(persos) == 0:
             reply = await message.channel.send(f'Qui?')
             MESSAGE_QUEUE.append(reply)
     elif message.content.startswith('jet'):
-        user = get_user(message)
-        if user is not None and user.id in perso.PJ:
-            le_perso = perso.PJ[user.id]
+        MESSAGE_QUEUE.append(message)
+        persos = get_perso(message)
+        if len(persos) == 0:
+            reply = await message.channel.send(f'Qui?')
+            MESSAGE_QUEUE.append(reply)
+        else:
+            user, le_perso = persos[0]
             scores, bonus, malus, poubelle, sign, mod, dice, result, reussite = regles.jet(le_perso, message.content.split()[1:])
             score_noms = ' '.join(f'{str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
             score_valeurs = ' '.join(f'{str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
-            cont = f'*{le_perso.nom}* ({user.mention}) fait un jet de ` {score_noms} ({score_valeurs} = {str_sign(sign)}{mod})`'
+            cont = f'{perso_label(le_perso, user)} fait un jet de ` {score_noms} ({score_valeurs} = {str_sign(sign)}{mod})`'
             if bonus > 0:
                 cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
             if malus > 0:

@@ -50,7 +50,7 @@ class RefNom(Ref):
             del TOUS[self.value]
         Ref.__setattr__(self, name, value)
         if value is not None:
-            TOUS[value] = self.perso
+            TOUS[value.lower()] = self.perso
 
 class Niveau:
     def __init__(self, name):
