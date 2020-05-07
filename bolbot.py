@@ -65,6 +65,10 @@ def perso_label(p, user):
     if user is None:
         return f'**{p.nom}**'
     return f'**{p.nom}** ({user.mention})'
+
+async def reply(message, content):
+    r = await message.channel.send(content)
+    MESSAGE_QUEUE.append(r)
     
 @client.event
 async def on_message(message):
@@ -73,9 +77,9 @@ async def on_message(message):
         return
     r = parse_des(message.content)
     if r is not None:
+        MESSAGE_QUEUE.append(message)
         dice, _, result = regles.lance(**r)
-        reply = await message.channel.send(f'{message.author.mention} lance `{message.content}`\n{dice_icons(dice)}\n**{result}**')
-        MESSAGE_QUEUE.extend([message, reply])
+        await reply(message, f'{message.author.mention} lance `{message.content}`\n{dice_icons(dice)}\n**{result}**')
     elif message.content == 'purge':
         MESSAGE_QUEUE.append(message)
         await message.channel.delete_messages(MESSAGE_QUEUE)
@@ -84,17 +88,14 @@ async def on_message(message):
         MESSAGE_QUEUE.append(message)
         persos = get_perso(message)
         for user, p in persos:
-            reply = await message.channel.send(f'Fiche de perso de {perso_label(p, user)}\n{p.fiche()}')
-            MESSAGE_QUEUE.append(reply)
+            await reply(message, f'Fiche de perso de {perso_label(p, user)}\n{p.fiche()}')
         if len(persos) == 0:
-            reply = await message.channel.send(f'Qui?')
-            MESSAGE_QUEUE.append(reply)
+            await reply(message, f'Qui?')
     elif message.content.startswith('jet'):
         MESSAGE_QUEUE.append(message)
         persos = get_perso(message)
         if len(persos) == 0:
-            reply = await message.channel.send(f'Qui?')
-            MESSAGE_QUEUE.append(reply)
+            await reply(message, f'Qui?')
         else:
             user, le_perso = persos[0]
             scores, bonus, malus, poubelle, sign, mod, dice, result, reussite = regles.jet(le_perso, message.content.split()[1:])
@@ -109,8 +110,7 @@ async def on_message(message):
                 cont += f' (inconnus: {", ".join(poubelle)})'
             cont += f'\n{dice_icons(dice)}\n'
             cont += f'**{result}** **{reussite.name.capitalize()}**'
-            reply = await message.channel.send(cont)
-            MESSAGE_QUEUE.extend([message, reply])
+            await reply(message, cont)
     else:
         print (f'{message}\n    {message.content}')
             
