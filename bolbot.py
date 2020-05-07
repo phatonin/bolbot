@@ -17,7 +17,7 @@ async def on_ready():
     print (f'{client.user} has connected to Discord!')
 
 @client.event
-async def on_error(event, *args, **kwargs):
+async def on_error(event, *args, **_):
     if event == 'on_message':
         print (f'Unhandled message: {args[0]}')
     raise
@@ -114,7 +114,7 @@ async def on_message(message):
     else:
         print (f'{message}\n    {message.content}')
             
-perso.load_pjs()
+perso.load('data/PJ', True)
 print (perso.TOUS)
 print (perso.PJ)
 client.run(TOKEN)

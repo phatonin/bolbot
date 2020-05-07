@@ -8,21 +8,28 @@ import collections
 import itertools
 import re
 import os
-    
+import os.path
 
 
 PJ = {}
 TOUS = {}
 
+def load(path, pj=False):
+    print (path)
+    print (os.path.isfile(path))
+    if os.path.isdir(path):
+        for fn in os.listdir(path):
+            load(os.path.join(path, fn), pj)
+    elif os.path.isfile(path) and path.endswith('.fdp'):
+        print ('perso: ' + path)
+        p = Perso()
+        p.parse_file(path)
+        if pj:
+            print ('PJ!')
+            p.niveau = Niveau.PJ
+            userid = int(os.path.basename(path)[:-4])
+            PJ[userid] = p
 
-def load_pjs(path='.'):
-    for fn in os.listdir(path):
-        if fn.endswith('.fdp'):
-            userid = int(fn[:-4])
-            pj = Perso(Niveau.PJ)
-            pj.parse_file(fn)
-            PJ[userid] = pj
-    
 class Ref:
     def __init__(self, value, name=None):
         self.value = value
@@ -55,15 +62,15 @@ class RefNom(Ref):
 class Niveau:
     def __init__(self, name):
         self.name = name
-Niveau.PJ = Niveau('PJ')
+Niveau.PJ = Niveau('pj')
 Niveau.Pietaille = Niveau('piétaille')
 Niveau.Coriace = Niveau('coriace')
-Niveau.Rival = Niveau('Rival')
+Niveau.Rival = Niveau('rival')
 
 class Perso:
     LINE_PATTERN = re.compile(r'(?P<k>\w+)\s*[:=]?\s*(?P<v>.+)', re.RegexFlag.IGNORECASE)
-    def __init__(self, niveau):
-        self.niveau = niveau
+    def __init__(self):
+        self.niveau = Ref(None)
         self.nom = RefNom(None, self)
         self.origine = Ref(None)
         self.langues = Ref([])
