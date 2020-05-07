@@ -64,7 +64,6 @@ def _try_int(v):
     except ValueError:
         return False        
 
-MENTION_PATTERN = re.compile(r'^<@!\d+>$')
 def parse_jet(le_perso, tokens):
     poubelle = []
     scores = []
@@ -73,9 +72,7 @@ def parse_jet(le_perso, tokens):
     sign = 1
     for t in tokens:
         t = t.lower()
-        if MENTION_PATTERN.match(t):
-            sign = 1
-        elif _try_int(t):
+        if _try_int(t):
             i = int(t)
             if i < 0:
                 scores.append((-1, perso.Ref(abs(i), t)))
@@ -108,8 +105,6 @@ def parse_jet(le_perso, tokens):
             sign = 1
         elif t in le_perso.desavantages.value:
             malus += 1
-            sign = 1
-        elif t in perso.TOUS:
             sign = 1
         else:
             poubelle.append(t)

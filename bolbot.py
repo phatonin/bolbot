@@ -11,15 +11,45 @@ dotenv.load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 class Command:
+    DIGITS = ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine')
+
     def __init__(self, client):
         self.client = client
 
     async def get_reply(self, message):
         raise NotImplementedError()
+    
+    def get_perso(self, message):
+        result = []
+        for t in message.content.lower().split():
+            if t in self.client.persos_par_nom:
+                result.append((None, self.client.persos_par_nom[t]))
+        for user in message.mentions:
+            if user.id in self.client.pj_par_userid:
+                result.append((user, self.client.pj_par_userid[user.id]))
+        if len(result) == 0 and message.author.id in self.client.pj_par_userid:
+            result.append((message.author, self.client.pj_par_userid[message.author.id]))
+        return result
+        
+    @staticmethod
+    def perso_label(p, user):
+        if user is None:
+            return f'**{p.nom}**'
+        return f'**{p.nom}** ({user.mention})'
+
+    @staticmethod    
+    def str_sign(n):
+        if n == 1:
+            return '+'
+        if n == -1:
+            return '-'
+
+    @staticmethod    
+    def dice_icons(dice):
+        return ' '.join(f':{Command.DIGITS[n]}:' for n in dice)
 
 class CommandLance(Command):
     DICE_PATTERN = re.compile(r'^(?P<n>[12]?)d(?P<d>[36]?)\s*(?P<k>[MB]*)\s*(?:(?P<s>[+-])\s*(?P<m>\d+))?$', re.RegexFlag.IGNORECASE)
-    DIGITS = ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine')
 
     def __init__(self, client):
         Command.__init__(self, client)
@@ -27,13 +57,13 @@ class CommandLance(Command):
     async def get_reply(self, message):
         r = CommandLance.parse_des(message.content)
         if r is None:
-            return None
+            return ()
         dice, _, result = regles.lance(**r)
-        return f'{message.author.mention} lance `{message.content}`\n{CommandLance.dice_icons(dice)}\n**{result}**'
+        return (f'{message.author.mention} lance `{message.content}`\n{Command.dice_icons(dice)}\n**{result}**',)
 
     @staticmethod
     def parse_des(expr):
-        m = BoLClient.DICE_PATTERN.match(expr)
+        m = CommandLance.DICE_PATTERN.match(expr)
         if m is not None:
             return {
                 'number_read': 1 if m.group('n') == '' else int(m.group('n')),
@@ -45,21 +75,68 @@ class CommandLance(Command):
             }
         return None
 
-    @staticmethod    
-    def dice_icons(dice):
-        return ' '.join(f':{BoLClient.DIGITS[n]}:' for n in dice)
-
 class CommandPurge(Command):
     def __init__(self, client):
         Command.__init__(self, client)
         
     async def get_reply(self, message):
         if message.content != 'purge':
-            return None
+            return ()
         await message.channel.delete_messages(self.client.message_queue)
         n = len(self.client.message_queue)
-        self.message_queue = []
-        return ':x: Purged {n} messages'
+        self.client.message_queue = []
+        return (f':x: {n} messages supprimés',)
+
+class CommandFDP(Command):
+    def __init__(self, client):
+        Command.__init__(self, client)
+        
+    async def get_reply(self, message):
+        if not message.content.startswith('fdp'):
+            return ()
+        persos = self.get_perso(message)
+        if len(persos) == 0:
+            return (':warning: Qui?',)
+        return tuple(f'Fiche de perso de {Command.perso_label(p, user)}\n{p.fiche()}' for user, p in persos)
+
+class CommandJet(Command):
+    MENTION_PATTERN = re.compile(r'^<@!\d+>$')
+    
+    def __init__(self, client):
+        Command.__init__(self, client)
+        
+    def ok_token(self, token):
+        if CommandJet.MENTION_PATTERN.match(token):
+            return False
+        if token.lower() in self.client.persos_par_nom:
+            return False
+        return True
+    
+    def tokenize(self, message):
+        for t in message.content.split()[1:]:
+            if self.ok_token(t):
+                yield t
+        
+    async def get_reply(self, message):
+        if not message.content.startswith('jet'):
+            return ()
+        persos = self.get_perso(message)
+        if len(persos) == 0:
+            return (':warning: Qui?',)
+        user, le_perso = persos[0]
+        scores, bonus, malus, poubelle, sign, mod, dice, result, reussite = regles.jet(le_perso, self.tokenize(message))
+        score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
+        score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
+        cont = f'{Command.perso_label(le_perso, user)} fait un jet de ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
+        if bonus > 0:
+            cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
+        if malus > 0:
+            cont += f' {"et" if malus > 0 else "avec"} {malus} dé{"" if malus == 1 else "s"} de malus'
+        if poubelle:
+            cont += f' (inconnus: {", ".join(poubelle)})'
+        cont += f'\n{Command.dice_icons(dice)}\n'
+        cont += f'**{result}** **{reussite.name.capitalize()}**'
+        return (cont,)
 
 class BoLClient(discord.Client):
     def __init__(self, pj_path):
@@ -70,8 +147,8 @@ class BoLClient(discord.Client):
         for pj, path in perso.load(pj_path):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
-            self.persos_par_nom[pj.nom] = pj
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge))
+            self.persos_par_nom[pj.nom.value.lower()] = pj
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet))
         
     async def on_ready(self):
         print (f'{self.user} has connected to Discord!')
@@ -81,29 +158,6 @@ class BoLClient(discord.Client):
             print (f'Unhandled message: {args[0]}')
         raise
     
-    def get_perso(self, message):
-        result = []
-        for t in message.content.lower().split():
-            if t in self.persos_par_nom:
-                result.append((None, self.persos_par_nom[t]))
-        for user in message.mentions:
-            if user.id in self.pj_par_userid:
-                result.append((user, self.pj_par_userid[user.id]))
-        if len(result) == 0 and message.author.id in self.pj_par_userid:
-            result.append((message.author, self.pj_par_userid[message.author.id]))
-        return result
-    
-    def str_sign(self, n):
-        if n == 1:
-            return '+'
-        if n == -1:
-            return '-'
-        
-    def perso_label(self, p, user):
-        if user is None:
-            return f'**{p.nom}**'
-        return f'**{p.nom}** ({user.mention})'
-    
     async def reply(self, message, content):
         r = await message.channel.send(content)
         self.message_queue.append(r)
@@ -111,42 +165,14 @@ class BoLClient(discord.Client):
     async def on_message(self, message):
         if message.author.bot:
             return
-        r = self.parse_des(message.content)
-        if r is not None:
-            self.message_queue.append(message)
-            dice, _, result = regles.lance(**r)
-            await self.reply(message, f'{message.author.mention} lance `{message.content}`\n{self.dice_icons(dice)}\n**{result}**')
-        elif message.content == 'purge':
-            self.message_queue.append(message)
-            await message.channel.delete_messages(self.message_queue)
-            self.message_queue = []
-        elif message.content.startswith('fdp'):
-            self.message_queue.append(message)
-            persos = self.get_perso(message)
-            for user, p in persos:
-                await self.reply(message, f'Fiche de perso de {self.perso_label(p, user)}\n{p.fiche()}')
-            if len(persos) == 0:
-                await self.reply(message, f'Qui?')
-        elif message.content.startswith('jet'):
-            self.message_queue.append(message)
-            persos = self.get_perso(message)
-            if len(persos) == 0:
-                await self.reply(message, f'Qui?')
-            else:
-                user, le_perso = persos[0]
-                scores, bonus, malus, poubelle, sign, mod, dice, result, reussite = regles.jet(le_perso, message.content.split()[1:])
-                score_noms = ' '.join(f'{self.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
-                score_valeurs = ' '.join(f'{self.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
-                cont = f'{self.perso_label(le_perso, user)} fait un jet de ` {score_noms} ({score_valeurs} = {self.str_sign(sign)}{mod})`'
-                if bonus > 0:
-                    cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
-                if malus > 0:
-                    cont += f' {"et" if malus > 0 else "avec"} {malus} dé{"" if malus == 1 else "s"} de malus'
-                if poubelle:
-                    cont += f' (inconnus: {", ".join(poubelle)})'
-                cont += f'\n{self.dice_icons(dice)}\n'
-                cont += f'**{result}** **{reussite.name.capitalize()}**'
-                await self.reply(message, cont)
+        for cmd in self.commands:
+            contents = await cmd.get_reply(message)
+            if len(contents) > 0:
+                self.message_queue.append(message)
+                for content in contents:
+                    reply = await message.channel.send(content)
+                    self.message_queue.append(reply)
+                break
         else:
             print (f'{message}\n    {message.content}')
 
