@@ -5,8 +5,6 @@ Created on May 5, 2020
 '''
 
 import random
-import perso
-import re
 
 def lance(number_read=1, dice_type=6, bonus=0, malus=0, sign=1, mod=0):
     number_rolled = number_read + bonus + malus
@@ -64,60 +62,12 @@ def _try_int(v):
     except ValueError:
         return False        
 
-def parse_jet(le_perso, tokens):
-    poubelle = []
-    scores = []
-    bonus = 0
-    malus = 0
-    sign = 1
-    for t in tokens:
-        t = t.lower()
-        if _try_int(t):
-            i = int(t)
-            if i < 0:
-                scores.append((-1, perso.Ref(abs(i), t)))
-            else:
-                scores.append((sign, perso.Ref(i, t)))
-            sign = 1
-        elif t == 'b' or t == 'bonus':
-            bonus += 1
-            sign = 1
-        elif t == 'm' or t == 'malus':
-            malus += 1
-            sign = 1
-        elif t == '-':
-            sign = -1
-        elif t == '+':
-            sign = 1
-        elif t in Difficulte.MAP:
-            d = Difficulte.MAP[t]
-            scores.append((d.sign, perso.Ref(d.mod, d.name)))
-            sign = 1
-        elif t in le_perso.ref_map:
-            ref = le_perso.ref_map[t]
-            if _try_int(ref.value):
-                scores.append((sign, ref))
-            else:
-                poubelle.append(t)
-            sign = 1
-        elif t in le_perso.avantages.value:
-            bonus += 1
-            sign = 1
-        elif t in le_perso.desavantages.value:
-            malus += 1
-            sign = 1
-        else:
-            poubelle.append(t)
-            sign = 1
-    return scores, bonus, malus, poubelle
-
-def jet(le_perso, tokens):
-    scores, bonus, malus, poubelle = parse_jet(le_perso, tokens)
+def jet(scores, bonus, malus):
     score_total = sum(sign * int(ref.value) for sign, ref in scores)
     sign = 1 if score_total >= 0 else -1
     mod = abs(score_total)
     dice, sorted_dice, result = lance(2, 6, bonus, malus, sign, mod)
-    return scores, bonus, malus, poubelle, sign, mod, dice, result, Reussite.quel(sorted_dice, result)
+    return sign, mod, dice, result, Reussite.quel(sorted_dice, result)
 
 
 

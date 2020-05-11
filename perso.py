@@ -32,6 +32,13 @@ class Ref:
         
     def __isub__(self, other):
         self.value -= other
+        
+    def is_int(self):
+        try:
+            int(self.value)
+            return True
+        except ValueError:
+            return False
 
 class Niveau:
     def __init__(self, name):
