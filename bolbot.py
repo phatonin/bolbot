@@ -11,200 +11,142 @@ dotenv.load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 
-class Token:
+class Parser:
     WS = re.compile(r'\s*')
-    
-    def __init__(self, raw, le_perso=None):
-        self.raw = raw
+    PATTERNS = (
+        (
+            re.compile(r'<@!(?P<userid>\d+)>', re.RegexFlag.IGNORECASE),
+            'mention'
+        ),
+        (
+            re.compile(r'(?P<dice_number>\d+)d(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
+            'dice'
+        ),
+        (
+            re.compile(r'(?P<dice_number>\d+)d(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
+            'dice'
+        ),
+        (
+            re.compile(r'd(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
+            'dice'
+        ),
+        (
+            re.compile(r'(?P<number>[+-]?\d+)', re.RegexFlag.IGNORECASE),
+            'number'
+        ),
+        (
+            re.compile(r'(?P<sign>[+-])', re.RegexFlag.IGNORECASE),
+            'sign'
+        ),
+        (
+            re.compile(r'b(?:onus)', re.RegexFlag.IGNORECASE),
+            'bonus'
+        ),
+        (
+            re.compile(r'm(?:alus)', re.RegexFlag.IGNORECASE),
+            'malus'
+        ),
+        (
+            re.compile(r'(?P<string>\w+)', re.RegexFlag.IGNORECASE),
+            'string'
+        ),
+        (
+            re.compile(r'(?P<junk>\S+)', re.RegexFlag.IGNORECASE),
+            'junk'
+        )
+    )
+
+    def __init__(self, le_perso=None):
+        self.le_perso = le_perso
     
     @staticmethod
     def _skip_ws(s, pos):
-        m = Token.WS.match(s, pos=pos)
+        m = Parser.WS.match(s, pos=pos)
         return pos + len(m.group())
         
-    @staticmethod
-    def tokenize(s, le_perso=None):
+    def parse(self, s):
         pos = 0
         while pos < len(s):
-            pos = Token._skip_ws(s, pos)
-            for pat, ctor in Token.PATTERNS:
+            pos = Parser._skip_ws(s, pos)
+            for pat, meth in Parser.PATTERNS:
                 m = pat.match(s, pos)
                 if m is not None:
                     raw = m.group()
                     args = m.groupdict()
                     pos += len(raw)
-                    yield ctor(raw, le_perso=le_perso, **args)
+                    getattr(self, '_' + meth)(raw, **args)
                     break
-        
-
-class Mention(Token):
-    def __init__(self, raw, le_perso=None, userid=0):
-        Token.__init__(self, raw)
-        self.userid = int(userid)
-
-class Dice(Token):
-    def __init__(self, raw, le_perso=None, dice_number=1, dice_type=6, additional=''):
-        Token.__init__(self, raw)
-        self.dice_number = int(dice_number)
-        self.dice_type = int(dice_type)
-        self.bonus = additional.lower().count('b')
-        self.malus = additional.lower().count('m')
-
-class Number(Token):
-    def __init__(self, raw, le_perso=None, number=0):
-        Token.__init__(self, raw)
-        self.number = int(number)
-        
-class Sign(Token):
-    def __init__(self, raw, le_perso=None, sign=1):
-        Token.__init__(self, raw)
-        self.sign = 1 if (sign == '+' or sign >= 0) else -1
-
-class Bonus(Token):
-    def __init__(self, raw, le_perso=None):
-        Token.__init__(self, raw)
-
-class Malus(Token):
-    def __init__(self, raw, le_perso=None):
-        Token.__init__(self, raw)
-
-class Difficulte(Token):
-    def __init__(self, raw, le_perso=None, difficulte=regles.Difficulte.MOYENNE):
-        Token.__init__(self, raw, le_perso=le_perso)
-        self.difficulte = difficulte
-
-class Score(Token):
-    def __init__(self, raw, le_perso=None, ref=None):
-        Token.__init__(self, raw, le_perso=le_perso)
-        self.le_perso = le_perso
-        self.ref = ref
-
-class Junk(Token):
-    def __init__(self, raw, le_perso=None, junk=''):
-        Token.__init__(self, raw)
-        self.junk = junk
-
-def String(raw, le_perso=None, string=''):
-    if string.lower() in regles.Difficulte.MAP:
-        return Difficulte(raw, le_perso=le_perso, difficulte=regles.Difficulte.MAP[string])
-    if string.lower() in le_perso.ref_map:
-        return Score(raw, le_perso=le_perso, ref=le_perso.ref_map[string])
-    if string.lower() in le_perso.avantages.value:
-        return Bonus(raw, le_perso=le_perso)
-    if string.lower() in le_perso.desavantages.value:
-        return Malus(raw, le_perso=le_perso)
-    if string.lower() == le_perso.nom.value.lower():
-        return Score(raw, le_perso=le_perso, ref=le_perso.nom)
-    return Junk(raw, le_perso=le_perso, junk=string)
-
-Token.PATTERNS = (
-    (
-        re.compile(r'<@!(?P<userid>\d+)>', re.RegexFlag.IGNORECASE),
-        Mention
-    ),
-    (
-        re.compile(r'(?P<dice_number>\d+)d(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
-        Dice
-    ),
-    (
-        re.compile(r'(?P<dice_number>\d+)d(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
-        Dice
-    ),
-    (
-        re.compile(r'd(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
-        Dice
-    ),
-    (
-        re.compile(r'(?P<number>[+-]?\d+)', re.RegexFlag.IGNORECASE),
-        Number
-    ),
-    (
-        re.compile(r'(?P<sign>[+-])', re.RegexFlag.IGNORECASE),
-        Sign
-    ),
-    (
-        re.compile(r'b(?:onus)', re.RegexFlag.IGNORECASE),
-        Bonus
-    ),
-    (
-        re.compile(r'm(?:alus)', re.RegexFlag.IGNORECASE),
-        Malus
-    ),
-    (
-        re.compile(r'(?P<string>\w+)', re.RegexFlag.IGNORECASE),
-        String
-    ),
-    (
-        re.compile(r'(?P<junk>\S+)', re.RegexFlag.IGNORECASE),
-        Junk
-    )
-)
-
-class TokenVisitor:
-    def __init__(self):
-        pass
-    
-    def parse(self, s, le_perso=None):
-        self.start()
-        for t in Token.tokenize(s, le_perso=le_perso):
-            self.visit_token(t)
         return self.finish()
+                
+    def _mention(self, raw, userid):
+        self.mention(raw, int(userid))
     
-    def start(self):
+    def mention(self, raw, userid):
+        raise NotImplementedError()
+    
+    def _dice(self, raw, dice_number=1, dice_type=6, additional=''):
+        ladditional = additional.lower()
+        self.dice(raw, int(dice_number), int(dice_type), ladditional.count('b'), ladditional.count('m'))
+        
+    def dice(self, raw, dice_number, dice_type, bonus, malus):
+        raise NotImplementedError()
+    
+    def _number(self, raw, number):
+        self.number(raw, int(number))
+        
+    def number(self, raw, number):
+        raise NotImplementedError()
+        
+    def _sign(self, raw, sign):
+        if sign == '+':
+            self.sign(raw, 1)
+        elif sign == '-':
+            self.sign(raw, -1)
+    
+    def sign(self, raw, sign):
+        raise NotImplementedError()
+    
+    def _bonus(self, raw):
+        self.bonus(raw)
+        
+    def _malus(self, raw):
+        self.malus(raw)
+        
+    def bonus(self, raw):
+        raise NotImplementedError()
+    
+    def malus(self, raw):
+        raise NotImplementedError()
+    
+    def _junk(self, raw):
+        self.junk(raw)
+        
+    def junk(self, raw):
+        raise NotImplementedError()
+    
+    def _string(self, raw, string):
+        if string.lower() in regles.Difficulte.MAP:
+            self.difficulte(raw, regles.Difficulte.MAP[string])
+        elif self.le_perso is not None:
+            if string.lower() in self.le_perso.ref_map:
+                self.score(raw, self.le_perso.ref_map[string])
+            elif string.lower() in self.le_perso.avantages.value:
+                self.bonus(raw)
+            elif string.lower() in self.le_perso.desavantages.value:
+                self.malus(raw)
+            else:
+                self.junk(raw)
+        else:
+            self.junk(raw)
+
+    def difficulte(self, raw, difficulte):
+        raise NotImplementedError()
+    
+    def score(self, raw, ref):
         raise NotImplementedError()
     
     def finish(self):
         raise NotImplementedError()
-    
-    def visit_token(self, t):
-        if isinstance(t, Dice):
-            self.visit_dice(t)
-        elif isinstance(t, Number):
-            self.visit_number(t)
-        elif isinstance(t, Mention):
-            self.visit_mention(t)
-        elif isinstance(t, Sign):
-            self.visit_sign(t)
-        elif isinstance(t, Junk):
-            self.visit_junk(t)
-        elif isinstance(t, Bonus):
-            self.visit_bonus(t)
-        elif isinstance(t, Malus):
-            self.visit_malus(t)
-        elif isinstance(t, Difficulte):
-            self.visit_difficulte(t)
-        elif isinstance(t, Score):
-            self.visit_score(t)
-        else:
-            raise RuntimeError()
-
-    def visit_dice(self, t):
-        raise NotImplementedError()
-
-    def visit_number(self, t):
-        raise NotImplementedError()
-
-    def visit_mention(self, t):
-        raise NotImplementedError()
-
-    def visit_sign(self, t):
-        raise NotImplementedError()
-
-    def visit_junk(self, t):
-        raise NotImplementedError()
-
-    def visit_bonus(self, t):
-        raise NotImplementedError()
-
-    def visit_malus(self, t):
-        raise NotImplementedError()
-
-    def visit_difficulte(self, t):
-        raise NotImplementedError()
-
-    def visit_score(self, t):
-        raise NotImplementedError()
-
 
 class Command:
     DIGITS = ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine')
@@ -226,12 +168,14 @@ class Command:
         if len(result) == 0 and message.author.id in self.client.pj_par_userid:
             result.append((message.author, self.client.pj_par_userid[message.author.id]))
         return result
-        
+    
     @staticmethod
-    def perso_label(p, user):
-        if user is None:
+    def perso_label(p, userid):
+        if userid is None:
             return f'**{p.nom}**'
-        return f'**{p.nom}** ({user.mention})'
+        if p is None:
+            return f'<@!{userid}>'
+        return f'**{p.nom}** (<@!{userid}>)'
 
     @staticmethod    
     def str_sign(n):
@@ -244,6 +188,76 @@ class Command:
     def dice_icons(dice):
         return ' '.join(f':{Command.DIGITS[n]}:' for n in dice)
 
+class LanceJetParser(Parser):
+    def __init__(self, client, userid):
+        Parser.__init__(self)
+        self.poubelle = []
+        self.scores = []
+        self.current_sign = 1
+        self.client = client
+        self.userid = None
+        self.mention(str(userid), userid)
+
+    def number(self, raw, number):
+        if number < 0:
+            self.scores.append((-1, perso.Ref(abs(number), raw)))
+        else:
+            self.scores.append((self.current_sign, perso.Ref(number, raw)))
+        self.current_sign = 1
+
+    def mention(self, raw, userid):
+        self.userid = userid
+        if userid in self.client.pj_par_userid:
+            self.le_perso = self.client.pj_par_userid[userid]
+        self.current_sign = 1
+
+    def sign(self, raw, sign):
+        self.current_sign = sign
+
+    def junk(self, raw):
+        if raw.lower() in self.client.persos_par_nom:
+            self.le_perso = self.client.persos_par_nom[raw.lower()]
+        else:
+            self.poubelle.append(raw)
+        self.current_sign = 1
+
+    def difficulte(self, raw, difficulte):
+        self.scores.append((difficulte.sign, perso.Ref(difficulte.mod, difficulte.name)))
+        self.current_sign = 1
+
+    def score(self, raw, ref):
+        if ref.name != 'nom':
+            if ref.is_int():
+                self.scores.append((self.current_sign, ref))
+            else:
+                self.poubelle.append(raw)
+        self.current_sign = 1
+
+class LanceParser(LanceJetParser):
+    def __init__(self, client, userid):
+        LanceJetParser.__init__(self, client, userid)
+        self.lance = (None, None, None)
+        self.des = None
+        
+    def finish(self):
+        return self.lance, self.des, self.scores, self.poubelle
+
+    def dice(self, raw, dice_number, dice_type, bonus, malus):
+        if self.des is None:
+            self.lance = regles.lance(dice_number, dice_type, bonus, malus)
+            self.des = raw
+        else:
+            self.poubelle.append(raw)
+        self.current_sign = 1
+
+    def bonus(self, raw):
+        self.poubelle.append(raw)
+        self.current_sign = 1
+
+    def malus(self, raw):
+        self.poubelle.append(raw)
+        self.current_sign = 1
+
 class CommandLance(Command):
     DICE_PATTERN = re.compile(r'^(?P<n>[12]?)d(?P<d>[36]?)\s*(?P<k>[MB]*)\s*(?:(?P<s>[+-])\s*(?P<m>\d+))?$', re.RegexFlag.IGNORECASE)
 
@@ -251,11 +265,22 @@ class CommandLance(Command):
         Command.__init__(self, client)
         
     async def get_reply(self, message):
-        r = CommandLance.parse_des(message.content)
-        if r is None:
+        if not message.content.startswith('lance'):
             return ()
-        dice, _, result = regles.lance(**r)
-        return (f'{message.author.mention} lance `{message.content}`\n{Command.dice_icons(dice)}\n**{result}**',)
+        parser = LanceParser(self.client, message.author.id)
+        (dice, _sorted_dice, result), des, scores, poubelle = parser.parse(message.content[5:])
+        if parser.dice is None:
+            return (':warning: Lance quoi?',)
+        score_total, sign, mod = regles.sum_scores(scores)
+        final = result + score_total
+        score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
+        score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
+        cont = f'{Command.perso_label(parser.le_perso, parser.userid)} lance `{des} {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
+        if poubelle:
+            cont += f' (inconnus: {", ".join(poubelle)})'
+        cont += f'\n{Command.dice_icons(dice)}\n'
+        cont += f'**{final}**'
+        return (cont,)
 
     @staticmethod
     def parse_des(expr):
@@ -295,62 +320,26 @@ class CommandFDP(Command):
             return (':warning: Qui?',)
         return tuple(f'Fiche de perso de {Command.perso_label(p, user)}\n{p.fiche()}' for user, p in persos)
         
-class JetTokenVisitor(TokenVisitor):
-    def __init__(self):
-        TokenVisitor.__init__(self)
-        
-    def start(self):
-        self.poubelle = []
-        self.scores = []
-        self.bonus = 0
-        self.malus = 0
-        self.sign = 1
+class JetParser(LanceJetParser):
+    def __init__(self, client, userid):
+        LanceJetParser.__init__(self, client, userid)
+        self.n_bonus = 0
+        self.n_malus = 0
         
     def finish(self):
-        return self.scores, self.bonus, self.malus, self.poubelle
+        return self.scores, self.n_bonus, self.n_malus, self.poubelle
 
-    def visit_dice(self, t):
-        self.poubelle.append(t.raw)
-        self.sign = 1
+    def dice(self, raw, dice_number, dice_type, bonus, malus):
+        self.poubelle.append(raw)
+        self.current_sign = 1
 
-    def visit_number(self, t):
-        if t.number < 0:
-            self.scores.append((-1, perso.Ref(abs(t.number), t.raw)))
-        else:
-            self.scores.append((self.sign, perso.Ref(t.number, t.raw)))
-        self.sign = 1
+    def bonus(self, raw):
+        self.n_bonus += 1
+        self.current_sign = 1
 
-    def visit_mention(self, t):
-        self.sign = 1
-
-    def visit_sign(self, t):
-        self.sign = t.sign
-
-    def visit_junk(self, t):
-        self.poubelle.append(t.raw)
-        self.sign = 1
-
-    def visit_bonus(self, t):
-        self.bonus += 1
-        self.sign = 1
-
-    def visit_malus(self, t):
-        self.malus += 1
-        self.sign = 1
-
-    def visit_difficulte(self, t):
-        d = t.difficulte
-        self.scores.append((d.sign, perso.Ref(d.mod, d.name)))
-        self.sign = 1
-
-    def visit_score(self, t):
-        if t.ref.name != 'nom':
-            if t.ref.is_int():
-                self.scores.append((self.sign, t.ref))
-            else:
-                self.poubelle.append(t.raw)
-        self.sign = 1
-        
+    def malus(self, raw):
+        self.n_malus += 1
+        self.current_sign = 1
     
 class CommandJet(Command):
     MENTION_PATTERN = re.compile(r'^<@!\d+>$')
@@ -361,15 +350,14 @@ class CommandJet(Command):
     async def get_reply(self, message):
         if not message.content.startswith('jet'):
             return ()
-        persos = self.get_perso(message)
-        if len(persos) == 0:
+        parser = JetParser(self.client, message.author.id)
+        scores, bonus, malus, poubelle = parser.parse(message.content[3:])
+        if parser.le_perso is None:
             return (':warning: Qui?',)
-        user, le_perso = persos[0]
-        scores, bonus, malus, poubelle = JetTokenVisitor().parse(message.content[3:], le_perso)
         sign, mod, dice, result, reussite = regles.jet(scores, bonus, malus)
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
-        cont = f'{Command.perso_label(le_perso, user)} fait un jet de ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
+        cont = f'{Command.perso_label(parser.le_perso, parser.userid)} fait un jet de ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
         if bonus > 0:
             cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
         if malus > 0:

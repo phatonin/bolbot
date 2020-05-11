@@ -6,7 +6,7 @@ Created on May 5, 2020
 
 import random
 
-def lance(number_read=1, dice_type=6, bonus=0, malus=0, sign=1, mod=0):
+def lance(number_read=1, dice_type=6, bonus=0, malus=0):
     number_rolled = number_read + bonus + malus
     dice = [random.randint(1, dice_type) for _ in range(number_rolled)]
     sorted_dice = sorted(dice)
@@ -14,7 +14,7 @@ def lance(number_read=1, dice_type=6, bonus=0, malus=0, sign=1, mod=0):
         sorted_dice.pop(0)
     for _ in range(malus):
         sorted_dice.pop(-1)
-    result = sum(sorted_dice) + sign * mod
+    result = sum(sorted_dice)
     return dice, sorted_dice, result
 
 class Reussite:
@@ -62,12 +62,17 @@ def _try_int(v):
     except ValueError:
         return False        
 
-def jet(scores, bonus, malus):
+def sum_scores(scores):
     score_total = sum(sign * int(ref.value) for sign, ref in scores)
     sign = 1 if score_total >= 0 else -1
     mod = abs(score_total)
-    dice, sorted_dice, result = lance(2, 6, bonus, malus, sign, mod)
-    return sign, mod, dice, result, Reussite.quel(sorted_dice, result)
+    return score_total, sign, mod
+
+def jet(scores, bonus, malus):
+    dice, sorted_dice, result = lance(2, 6, bonus, malus)
+    score_total, sign, mod = sum_scores(scores)
+    final = result + score_total
+    return sign, mod, dice, final, Reussite.quel(sorted_dice, final)
 
 
 
