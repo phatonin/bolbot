@@ -416,15 +416,15 @@ class CommandPerdGagne(Command):
             return (':warning: Combien?',)
         score_total, sign, mod = regles.sum_scores(scores)
         final = result + score_total
-        score.value = int(score.value) + sign_global * final
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
-        cont = f'{Command.perso_label(le_perso, userid)} {sign_str} `{"" if des is None else des} {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})` en {score.name}'
+        cont = f'{Command.perso_label(le_perso, userid)} {sign_str} `{"" if des is None else des} {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})` en **{score.name.capitalize()}** ({score.value})'
         if poubelle:
             cont += f' (inconnus: {", ".join(poubelle)})'
         if des is not None:
             cont += f'\n{Command.dice_icons(rolls)}'
-        cont += f'\n**{final}**, **reste: {score.value}**'
+        score.value = max(min(int(score.value) + sign_global * final, score.max), 0)
+        cont += f'\n**{final}**\n**{score.name.capitalize()} = {score.value}**'
         return (cont,)
 
 
