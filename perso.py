@@ -20,9 +20,11 @@ def load(path):
         yield p, path
 
 class Ref:
-    def __init__(self, value, name=None):
+    def __init__(self, value, name=None, auto_ref=None, modifiable=False):
         self.value = value
         self.name = name
+        self.auto_ref = auto_ref
+        self.modifiable = modifiable
         
     def __str__(self):
         return str(self.value)
@@ -56,15 +58,15 @@ class Perso:
         self.origine = Ref(None)
         self.langues = Ref([])
         self.attributs = Attributs()
-        self.aptitudes_combat = AptitudesCombat()
+        self.aptitudes_combat = AptitudesCombat(self.attributs)
         self.carrieres = collections.OrderedDict()
         self.avantages = Ref([])
         self.desavantages = Ref([])
-        self.pouvoir = Ref(0)
-        self.foi = Ref(0)
-        self.creation = Ref(0)
-        self.vitalite = Ref(0)
-        self.heroisme = Ref(0)
+        self.pouvoir = Ref(0, modifiable=True)
+        self.foi = Ref(0, modifiable=True)
+        self.creation = Ref(0, modifiable=True)
+        self.vitalite = Ref(0, modifiable=True)
+        self.heroisme = Ref(0, modifiable=True)
         self.ref_map = {}
         self._add_ref_map(self.nom, 'nom')
         self._add_ref_map(self.origine, 'origine')
@@ -228,10 +230,10 @@ class Attributs:
         self.aura = Ref(0)
 
 class AptitudesCombat:
-    def __init__(self):
-        self.initiative = Ref(0)
-        self.melee = Ref(0)
-        self.tir = Ref(0)
+    def __init__(self, attributs):
+        self.initiative = Ref(0, auto_ref=attributs.esprit)
+        self.melee = Ref(0, auto_ref=attributs.vigueur)
+        self.tir = Ref(0, auto_ref=attributs.agilite)
         self.defense = Ref(0)
         
 class Cell:
