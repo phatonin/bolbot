@@ -406,7 +406,7 @@ class CommandPerdGagne(Command):
         else:
             return ()
         parser = PerdGagneParser(self.client, message.author.id)
-        score, des, rolls, result, scores, poubelle = parser.parse(message.content[4:])
+        score, des, rolls, result, scores, poubelle = parser.parse(message.content[len(sign_str):])
         le_perso, userid = parser.le_perso()
         if le_perso is None:
             return (':warning: Qui?',)
