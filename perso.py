@@ -111,10 +111,16 @@ class Perso:
             k = m.group('k').lower()
             v = m.group('v').strip()
             if k in self.ref_map:
+                ref = self.ref_map[k]
                 try:
-                    self.ref_map[k].value.append(v)
+                    ref.value.append(v)
                 except AttributeError:
-                    self.ref_map[k].value = v
+                    try:
+                        ref.value = int(v)
+                        if ref.modifiable:
+                            ref.max = ref.value
+                    except ValueError:
+                        ref.value = v
             else:
                 ref = Ref(v)
                 self.carrieres[k] = ref
