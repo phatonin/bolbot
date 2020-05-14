@@ -427,6 +427,18 @@ class CommandPerdGagne(Command):
         cont += f'\n**{final}**\n**{score.name.capitalize()} = {score.value}**'
         return (cont,)
 
+class CommandPNJ(Command):
+    def __init__(self, client):
+        Command.__init__(self, client)
+        
+    async def get_reply(self, message):
+        if not message.content.startswith('pnj'):
+            return ()
+        pnj = perso.Perso()
+        for line in message.content[3:].split('\n'):
+            pnj.parse_line(line.strip())
+        self.client.add_perso(pnj)
+        return (f'Fiche de perso de {Command.perso_label(pnj, None)}\n{pnj.fiche()}',)
 
 class BoLClient(discord.Client):
     def __init__(self, pj_path):
@@ -437,8 +449,11 @@ class BoLClient(discord.Client):
         for pj, path in perso.load(pj_path):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
-            self.persos_par_nom[pj.nom.value.lower()] = pj
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne))
+            self.add_perso(pj)
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ))
+        
+    def add_perso(self, p):
+        self.persos_par_nom[p.nom.value.lower()] = p
         
     async def on_ready(self):
         print (f'{self.user} has connected to Discord!')
