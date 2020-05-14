@@ -52,6 +52,8 @@ Niveau.Rival = Niveau('rival')
 
 class Perso:
     LINE_PATTERN = re.compile(r'(?P<k>\w+)\s*[:=]?\s*(?P<v>.+)', re.RegexFlag.IGNORECASE)
+    SHORT_PATTERN = re.compile(r'(?P<niv>\w+)\s+(?P<nom>\w+)\s+(?P<vig>\d)\s*(?P<agi>\d)\s*(?P<esp>\d)\s*(?P<aura>\d)\s+(?P<init>\d)\s*(?P<melee>\d)\s*(?P<tir>\d)\s*(?P<def>\d)\s+(?P<pv>\d+)', re.RegexFlag.IGNORECASE)
+
     def __init__(self):
         self.niveau = Ref(None)
         self.nom = Ref(None)
@@ -68,6 +70,7 @@ class Perso:
         self.vitalite = Ref(0, modifiable=True)
         self.heroisme = Ref(0, modifiable=True)
         self.ref_map = {}
+        self._add_ref_map(self.niveau, 'niveau', 'niv')
         self._add_ref_map(self.nom, 'nom')
         self._add_ref_map(self.origine, 'origine')
         self._add_ref_map(self.langues, 'langues', 'langue', 'lang')
@@ -105,35 +108,43 @@ class Perso:
                 if line != '':
                     self.parse_line(line)
  
+    def setv(self, k, v):
+        if k in self.ref_map:
+            ref = self.ref_map[k]
+            try:
+                ref.value.append(v)
+            except AttributeError:
+                try:
+                    ref.value = int(v)
+                    if ref.modifiable:
+                        ref.max = ref.value
+                except ValueError:
+                    ref.value = v
+        else:
+            ref = Ref(v)
+            self.carrieres[k] = ref
+            names = [k]
+            short = k[:3]
+            if short != k and short not in self.ref_map:
+                names.append(short)
+            self._add_ref_map(ref, *names)
+
     def parse_line(self, line):
+        m = Perso.SHORT_PATTERN.match(line)
+        if m is not None:
+            for k, v in m.groupdict().items():
+                self.setv(k, v)
+            return
         m = Perso.LINE_PATTERN.match(line)
         if m is not None:
             k = m.group('k').lower()
             v = m.group('v').strip()
-            if k in self.ref_map:
-                ref = self.ref_map[k]
-                try:
-                    ref.value.append(v)
-                except AttributeError:
-                    try:
-                        ref.value = int(v)
-                        if ref.modifiable:
-                            ref.max = ref.value
-                    except ValueError:
-                        ref.value = v
-            else:
-                ref = Ref(v)
-                self.carrieres[k] = ref
-                names = [k]
-                short = k[:3]
-                if short != k and short not in self.ref_map:
-                    names.append(short)
-                self._add_ref_map(ref, *names)
+            self.setv(k, v)
 
     def fiche(self):
         titres = [
                 [
-                    Cell(12, f'{self.nom} ({self.niveau.name})'),
+                    Cell(12, f'{self.nom} ({self.niveau.value})'),
                 ],
                 [
                     Cell(2, 'Origine'),
