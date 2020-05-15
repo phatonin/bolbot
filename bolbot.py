@@ -139,8 +139,8 @@ class Parser:
     def _junk(self, raw):
         if raw.lower() in regles.Difficulte.MAP:
             self.difficulte(raw, regles.Difficulte.MAP[raw])
-        elif raw.lower() in self.client.persos_par_nom:
-            self.persos.append((self.client.persos_par_nom[raw.lower()], None))
+        elif self.client.has_perso(raw):
+            self.persos.append((self.client.get_perso(raw), None))
         else:
             le_perso, _uid = self.le_perso()
             if le_perso is not None:
@@ -165,7 +165,7 @@ class Parser:
         self.ignorer(raw)
 
 class Command:
-    DIGITS = ('zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine')
+    DIGITS = (None, '<:die_1:710969366786867230>', '<:die_2:710969366794993724>', '<:die_3:710969366925279273>', '<:die_4:710969366644260975>', '<:die_5:710969366417506386>', '<:die_6:710969366421700662>')
 
     def __init__(self, client):
         self.client = client
@@ -176,8 +176,8 @@ class Command:
     def get_perso(self, message):
         result = []
         for t in message.content.lower().split():
-            if t in self.client.persos_par_nom:
-                result.append((None, self.client.persos_par_nom[t]))
+            if self.client.has_perso(t):
+                result.append((None, self.client.get_perso(t)))
         for user in message.mentions:
             if user.id in self.client.pj_par_userid:
                 result.append((user, self.client.pj_par_userid[user.id]))
@@ -202,8 +202,8 @@ class Command:
 
     @staticmethod    
     def dice_icons(dice):
-        return ' '.join(f':{Command.DIGITS[n]}:' for n in dice)
-
+        return ' '.join(Command.DIGITS[n] for n in dice)
+ 
 class LanceJetParser(Parser):
     def __init__(self, client, userid):
         Parser.__init__(self, client, userid)
@@ -441,20 +441,33 @@ class CommandPNJ(Command):
         return (f'Fiche de perso de {Command.perso_label(pnj, None)}\n{pnj.fiche()}',)
 
 class BoLClient(discord.Client):
+    NON_ALNUM_PATTERN = re.compile('[\W_]+')
+    
     def __init__(self, pj_path):
         discord.Client.__init__(self)
         self.message_queue = []
         self.pj_par_userid = {}
         self.persos_par_nom = {}
         for pj, path in perso.load(pj_path):
+            pj.niveau.value = 'pj'
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
             self.add_perso(pj)
         self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ))
         
     def add_perso(self, p):
-        self.persos_par_nom[p.nom.value.lower()] = p
+        self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p
         
+    def get_perso(self, nom):
+        return self.persos_par_nom[BoLClient._nom_canon(nom)]
+    
+    def has_perso(self, nom):
+        return BoLClient._nom_canon(nom) in self.persos_par_nom
+        
+    @staticmethod
+    def _nom_canon(nom):
+        return BoLClient.NON_ALNUM_PATTERN.sub('', nom).lower()
+    
     async def on_ready(self):
         print (f'{self.user} has connected to Discord!')
     
