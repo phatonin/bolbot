@@ -440,6 +440,38 @@ class CommandPNJ(Command):
         self.client.add_perso(pnj)
         return (f'Fiche de perso de {Command.perso_label(pnj, None)}\n{pnj.fiche()}',)
 
+class CloneParser(Parser):
+    def __init__(self, client, userid):
+        Parser.__init__(self, client, userid)
+        self.nombre = -1
+
+    def number(self, raw, number):
+        self.nombre = number
+        
+    def finish(self):
+        return self.le_perso()[0], self.nombre
+
+class CommandClone(Command):
+    def __init__(self, client):
+        Command.__init__(self, client)
+    
+    async def get_reply(self, message):
+        if not message.content.startswith('clone'):
+            return ()
+        parser = CloneParser(client, message.author.id)
+        le_perso, nombre = parser.parse(message.content[5:])
+        if le_perso is None:
+            return (':warning: Qui?',)
+        if nombre <= 0:
+            return (':warning: Combien?',)
+        noms = []
+        for n in range(nombre):
+            pnj = le_perso.clone()
+            pnj.nom.value += str(n+2)
+            noms.append(pnj.nom.value)
+            self.client.add_perso(pnj)
+        return (f'Le personnage {Command.perso_label(pnj, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
+
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
     
@@ -453,7 +485,7 @@ class BoLClient(discord.Client):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
             self.add_perso(pj)
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ))
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone))
         
     def add_perso(self, p):
         self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p

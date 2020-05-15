@@ -9,6 +9,7 @@ import itertools
 import re
 import os
 import os.path
+import copy
 
 def load(path):
     if os.path.isdir(path):
@@ -41,7 +42,7 @@ class Ref:
             return True
         except ValueError:
             return False
-
+        
 class Niveau:
     def __init__(self, name):
         self.name = name
@@ -89,6 +90,13 @@ class Perso:
         self._add_ref_map(self.creation, 'création', 'creation', 'créa', 'crea', 'cré', 'cre')
         self._add_ref_map(self.vitalite, 'vitalité', 'vitalite', 'vit', 'vie', 'pv')
         self._add_ref_map(self.heroisme, 'héroïsme', 'héroisme', 'heroïsme', 'heroisme', 'héros', 'heros')
+        
+    def clone(self, target=None):
+        if target is None:
+            target = Perso()
+        for k, ref in self.ref_map.items():
+            target.ref_map[k].value = copy.copy(ref.value)
+        return target
         
     def _add_ref_map(self, ref, *keys):
         for k in keys:
