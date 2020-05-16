@@ -3,3 +3,5 @@
 .pydevproject
 *.fdp
 __pycache__
+icons/
+TODO

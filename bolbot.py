@@ -467,6 +467,16 @@ class CommandClone(Command):
             self.client.add_perso(pnj)
         return (f'Le personnage {Command.perso_label(le_perso, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
 
+class CommandListe(Command):
+    def __init__(self, client):
+        Command.__init__(self, client)
+        
+    async def get_reply(self, message):
+        if not message.content.startswith('liste'):
+            return ()
+        return ('\n'.join(f'**{p.nom.value}** ({p.niveau.value})' for p in sorted(self.client.persos_par_nom.values(), key=(lambda p: p.niveau.value))),)
+            
+
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
     
@@ -480,7 +490,7 @@ class BoLClient(discord.Client):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
             self.add_perso(pj)
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone))
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe))
         
     def add_perso(self, p):
         self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p
