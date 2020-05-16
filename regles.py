@@ -15,7 +15,7 @@ def lance(number_read=1, dice_type=6, bonus=0, malus=0):
     for _ in range(malus):
         sorted_dice.pop(-1)
     result = sum(sorted_dice)
-    return dice, sorted_dice, result
+    return sorted(dice), sorted_dice, result
 
 class Reussite:
     def __init__(self, succes, name):

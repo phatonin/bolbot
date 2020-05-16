@@ -173,18 +173,6 @@ class Command:
     async def get_reply(self, message):
         raise NotImplementedError()
     
-    def get_perso(self, message):
-        result = []
-        for t in message.content.lower().split():
-            if self.client.has_perso(t):
-                result.append((None, self.client.get_perso(t)))
-        for user in message.mentions:
-            if user.id in self.client.pj_par_userid:
-                result.append((user, self.client.pj_par_userid[user.id]))
-        if len(result) == 0 and message.author.id in self.client.pj_par_userid:
-            result.append((message.author, self.client.pj_par_userid[message.author.id]))
-        return result
-    
     @staticmethod
     def perso_label(p, userid):
         if userid is None:
@@ -210,14 +198,21 @@ class LanceJetParser(Parser):
         self.scores = []
         self.current_sign = 1
         
-    def ajouter(self, ref, signe=None):
-        self.scores.append((self.current_sign if signe is None else signe, ref))
+    def ajouter(self, raw, ref, signe=None):
+        if signe is None:
+            signe = self.current_sign
+        e = (signe, ref)
+        if e in self.scores:
+            if raw is not None:
+                self.ignorer(raw)
+        else:
+            self.scores.append(e)
 
     def number(self, raw, number):
         if number < 0:
-            self.ajouter(perso.Ref(abs(number), raw), -1)
+            self.ajouter(raw, perso.Ref(abs(number), raw), -1)
         else:
-            self.ajouter(perso.Ref(number, raw))
+            self.ajouter(raw, perso.Ref(number, raw))
         self.current_sign = 1
 
     def sign(self, raw, sign):
@@ -228,15 +223,15 @@ class LanceJetParser(Parser):
         self.current_sign = 1
 
     def difficulte(self, raw, difficulte):
-        self.ajouter(perso.Ref(difficulte.mod, difficulte.name), difficulte.sign)
+        self.ajouter(raw, perso.Ref(difficulte.mod, difficulte.name), difficulte.sign)
         self.current_sign = 1
 
     def score(self, raw, ref):
         if ref.name != 'nom':
             if ref.is_int():
                 if ref.auto_ref is not None:
-                    self.ajouter(ref.auto_ref)
-                self.ajouter(ref)
+                    self.ajouter(None, ref.auto_ref)
+                self.ajouter(raw, ref)
             else:
                 self.ignorer(raw)
         self.current_sign = 1
@@ -283,8 +278,8 @@ class CommandLance(Command):
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
         cont = f'{Command.perso_label(*parser.le_perso())} lance `{des} {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
-        if poubelle:
-            cont += f' (inconnus: {", ".join(poubelle)})'
+        if len(poubelle):
+            cont += f' (ignoré: {", ".join(poubelle)})'
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{final}**'
         return (cont,)
@@ -332,8 +327,8 @@ class CommandJet(Command):
             cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
         if malus > 0:
             cont += f' {"et" if malus > 0 else "avec"} {malus} dé{"" if malus == 1 else "s"} de malus'
-        if poubelle:
-            cont += f' (inconnus: {", ".join(poubelle)})'
+        if len(poubelle) > 0:
+            cont += f' (ignoré: {", ".join(poubelle)})'
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{result}** **{reussite.name.capitalize()}**'
         return (cont,)
@@ -470,7 +465,7 @@ class CommandClone(Command):
             pnj.nom.value += str(n+2)
             noms.append(pnj.nom.value)
             self.client.add_perso(pnj)
-        return (f'Le personnage {Command.perso_label(pnj, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
+        return (f'Le personnage {Command.perso_label(le_perso, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
 
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
