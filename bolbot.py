@@ -6,6 +6,7 @@ import dotenv
 import re
 import perso
 import regles
+import collections
 
 dotenv.load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -335,6 +336,92 @@ class CommandJet(Command):
         cont += f'**{result}** **{reussite.name.capitalize()}**'
         return (cont,)
 
+class Arme:
+    TOUTES = collections.OrderedDict()
+    
+    def __init__(self, name, degats, aptitude, *keys):
+        self.name = name
+        self.degats = degats
+        self.aptitude = aptitude
+        self.parsed_degats = regles.parse_dice(degats)
+        Arme.TOUTES[name.lower()] = self
+        for k in keys:
+            Arme.TOUTES[k.lower()] = self
+        self.keys = keys
+    
+    def bonus_vigueur(self, aptitude):
+        raise NotImplemented()
+
+class MainsNues(Arme):
+    def __init__(self, name, *keys):
+        Arme.__init__(self, name, '1d3', 'melee', *keys)
+        
+    def bonus_vigueur(self, aptitude):
+        return 'vigueur/2'
+    
+class ArmeOutil(Arme):
+    def __init__(self, name, degats, aptitude, *keys):
+        Arme.__init__(self, name, degats, aptitude, *keys)
+        
+    def bonus_vigueur(self, aptitude):
+        if aptitude == 'melee':
+            return 'vigueur'
+        return 'vigueur/2'
+    
+class ArmeImprovisee(ArmeOutil):
+    def __init__(self, name, aptitude, *keys):
+        ArmeOutil.__init__(self, name, '1d3', aptitude, *keys)
+        
+class ArmeLegere(ArmeOutil):
+    def __init__(self, name, aptitude, *keys):
+        ArmeOutil.__init__(self, name, '1d6M', aptitude, *keys)
+        
+class ArmeMoyenne(ArmeOutil):
+    def __init__(self, name, aptitude, *keys):
+        ArmeOutil.__init__(self, name, '1d6', aptitude, *keys)
+        
+class ArmeLourde(ArmeOutil):
+    def __init__(self, name, aptitude, *keys):
+        ArmeOutil.__init__(self, name, '1d6B', aptitude, *keys)
+
+MainsNues('mains nues', 'mainsnues', 'mains', 'poings', 'pieds', 'main', 'poing', 'pied', 'rien', 'aucune')
+ArmeImprovisee('arme improvisée', None, 'improvisée', 'improvisee', 'impro', 'caillou', 'pierre')
+ArmeLegere('arme légère', None, 'légère', 'légere', 'legère', 'legere')
+ArmeMoyenne('arme moyenne', None, 'moyenne')
+ArmeLourde('arme lourde', None, 'lourde')
+ArmeLegere('dague', None)
+ArmeLegere('gourdin', 'melee')
+ArmeLegere('rapière', 'melee', 'rapiere')
+ArmeLegere('fronde', 'tir')
+ArmeLegere('javelot', 'tir')
+ArmeLegere('fléchette', 'tir', 'flechette', 'dard')
+ArmeMoyenne('bâton', 'melee', 'baton')
+ArmeMoyenne('épée', 'melee', 'épee', 'epée', 'epee', 'sword')
+ArmeMoyenne('fléau', 'melee', 'fleau')
+ArmeMoyenne('hache', None, 'axe')
+ArmeMoyenne('lance', None)
+ArmeMoyenne('masse d\'armes', None, 'masse')
+ArmeMoyenne('massue', None)
+ArmeMoyenne('arbalète', 'tir', 'arbalete')
+ArmeMoyenne('arc', 'tir')
+ArmeLourde('arme d\'hast', 'melee', 'hast')
+ArmeLourde('épée à deux mains', 'melee', 'deux mains', 'deux mains', 'deux')
+ArmeLourde('grande hache', 'melee', 'grande')
+ArmeLourde('morgenstern', 'melee')
+ArmeLourde('arbalète lourde', 'tir', 'balliste')
+
+class FrappeParser(JetParser):
+    def __init__(self, client, userid):
+        JetParser.__init__(self, client, userid, 2)
+        self.arme = None
+        
+    def junk(self, raw):
+        if raw in Arme.TOUTES:
+            self.arme = raw
+        else:
+            self.ignorer(raw)
+        self.current_sign = 1
+
 class CommandFrappe(Command):
     def __init__(self, client):
         Command.__init__(self, client)
@@ -342,17 +429,13 @@ class CommandFrappe(Command):
     async def get_reply(self, message):
         if message.content.startswith('frappe'):
             skip = 6
-            att = 'vigueur'
             apt = 'melee'
-            v = 'frappe'
         elif message.content.startswith('tir'):
             skip = 3
-            att = 'agilité'
             apt = 'tir'
-            v = 'tire sur'
         else:
             return ()
-        parser = JetParser(self.client, message.author.id, 2)
+        parser = FrappeParser(self.client, message.author.id)
         parser.parse(message.content[skip:])
         le_perso, userid = parser.le_perso()
         lautre_perso, userid2 = parser.lautre_perso()
@@ -360,14 +443,20 @@ class CommandFrappe(Command):
             return (':warning: Qui frappe?',)
         if lautre_perso is None:
             return (':warning: Frappe qui?',)
-        parser.ajouter(f'{att}', le_perso.ref_map[att])
-        parser.ajouter(f'{apt}', le_perso.ref_map[apt])
+        if parser.arme is None:
+            return (':warning: Avec quoi?',)
+        arme = Arme.TOUTES[parser.arme]
+        if arme.aptitude is not None:
+            apt = arme.aptitude
+        parser.score(f'{apt}', le_perso.ref_map[apt])
         parser.ajouter(f'défense ({lautre_perso.nom.value})', lautre_perso.aptitudes_combat.defense, -1)
+        if f'arme favorite ({arme.name})' in le_perso.avantages.value:
+            parser.bonus('arme favorite')
         scores, bonus, malus, poubelle = parser.finish()
         sign, mod, dice, result, reussite = regles.jet(scores, bonus, malus)
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
-        cont = f'{Command.perso_label(le_perso, userid)} {v} {Command.perso_label(lautre_perso, userid2)} ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
+        cont = f'{Command.perso_label(le_perso, userid)} {"tire sur" if apt == "tir" else "frappe"} {Command.perso_label(lautre_perso, userid2)} avec {arme.name.capitalize()} ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
         if bonus > 0:
             cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
         if malus > 0:
@@ -376,6 +465,19 @@ class CommandFrappe(Command):
             cont += f' (ignoré: {", ".join(poubelle)})'
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{result}** **{reussite.name.capitalize()}**'
+        if reussite.succes:
+            dg_dice, _, dg_result = regles.lance(**arme.parsed_degats)
+            bv = arme.bonus_vigueur(apt)
+            bvn = le_perso.ref_map[bv].value
+            if apt == 'tir' and 'tireur puissant' in le_perso.avantages.value:
+                cont += f'\n\n**Dégâts** `{arme.degats} + {bv.capitalize()} ({bvn}) + Tireur puissant ({le_perso.attributs.vigueur.value})`\n{Command.dice_icons(dg_dice)}\n'
+                dg_result += le_perso.attributs.vigueur.value
+            else:
+                cont += f'\n\n**Dégâts** `{arme.degats} + {bv.capitalize()} ({bvn})`\n{Command.dice_icons(dg_dice)}\n'
+            dg_result += bvn
+            cont += f'**{dg_result}**\n'
+            lautre_perso.vitalite.value -= dg_result
+            cont += f'{Command.perso_label(lautre_perso, userid2)}: {lautre_perso.vitalite.value} PV {"" if lautre_perso.vitalite.value > 0 else ":skull_crossbones:"}'
         return (cont,)
 
 class CommandPurge(Command):
