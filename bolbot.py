@@ -19,7 +19,7 @@ class Parser:
             'mention'
         ),
         (
-            re.compile(r'(?P<dice_number>\d+)d(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE),
+            regles.DICE_PATTERN,
             'dice'
         ),
         (
@@ -52,23 +52,27 @@ class Parser:
         )
     )
 
-    def __init__(self, client, userid):
+    def __init__(self, client, userid, n_perso=1):
         self.poubelle = []
         self.client = client
         self.persos = []
         self.mention(str(userid), userid)
+        self.n_perso = n_perso
 
     def ignorer(self, raw):
         self.poubelle.append(raw)
+
+    def les_persos(self):
+        result = list((p, u) for p, u in reversed(self.persos) if p is not None)
+        result.append((p, u) for p, u in reversed(self.persos) if p is None and u is not None)
+        result.append(((None, None), (None, None)))
+        return result
     
-    def le_perso(self): # dernier
-        for p, uid in reversed(self.persos):
-            if p is not None:
-                return p, uid
-        for p, uid in reversed(self.persos):
-            if uid is not None:
-                return p, uid
-        return None, None
+    def le_perso(self):
+        return self.les_persos()[(self.n_perso-1)]
+    
+    def lautre_perso(self):
+        return self.les_persos()[0]
 
     @staticmethod
     def _skip_ws(s, pos):
@@ -193,8 +197,8 @@ class Command:
         return ' '.join(Command.DIGITS[n] for n in dice)
  
 class LanceJetParser(Parser):
-    def __init__(self, client, userid):
-        Parser.__init__(self, client, userid)
+    def __init__(self, client, userid, n_perso=1):
+        Parser.__init__(self, client, userid, n_perso)
         self.scores = []
         self.current_sign = 1
         
@@ -285,8 +289,8 @@ class CommandLance(Command):
         return (cont,)
         
 class JetParser(LanceJetParser):
-    def __init__(self, client, userid):
-        LanceJetParser.__init__(self, client, userid)
+    def __init__(self, client, userid, n_perso=1):
+        LanceJetParser.__init__(self, client, userid, n_perso)
         self.n_bonus = 0
         self.n_malus = 0
         
@@ -306,8 +310,6 @@ class JetParser(LanceJetParser):
         self.current_sign = 1
 
 class CommandJet(Command):
-    MENTION_PATTERN = re.compile(r'^<@!\d+>$')
-    
     def __init__(self, client):
         Command.__init__(self, client)
 
@@ -323,6 +325,49 @@ class CommandJet(Command):
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
         cont = f'{Command.perso_label(le_perso, userid)} fait un jet de ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
+        if bonus > 0:
+            cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
+        if malus > 0:
+            cont += f' {"et" if malus > 0 else "avec"} {malus} dé{"" if malus == 1 else "s"} de malus'
+        if len(poubelle) > 0:
+            cont += f' (ignoré: {", ".join(poubelle)})'
+        cont += f'\n{Command.dice_icons(dice)}\n'
+        cont += f'**{result}** **{reussite.name.capitalize()}**'
+        return (cont,)
+
+class CommandFrappe(Command):
+    def __init__(self, client):
+        Command.__init__(self, client)
+
+    async def get_reply(self, message):
+        if message.content.startswith('frappe'):
+            skip = 6
+            att = 'vigueur'
+            apt = 'melee'
+            v = 'frappe'
+        elif message.content.startswith('tir'):
+            skip = 3
+            att = 'agilité'
+            apt = 'tir'
+            v = 'tire sur'
+        else:
+            return ()
+        parser = JetParser(self.client, message.author.id, 2)
+        parser.parse(message.content[skip:])
+        le_perso, userid = parser.le_perso()
+        lautre_perso, userid2 = parser.lautre_perso()
+        if le_perso is None:
+            return (':warning: Qui frappe?',)
+        if lautre_perso is None:
+            return (':warning: Frappe qui?',)
+        parser.ajouter(f'{att}', le_perso.ref_map[att])
+        parser.ajouter(f'{apt}', le_perso.ref_map[apt])
+        parser.ajouter(f'défense ({lautre_perso.nom.value})', lautre_perso.aptitudes_combat.defense, -1)
+        scores, bonus, malus, poubelle = parser.finish()
+        sign, mod, dice, result, reussite = regles.jet(scores, bonus, malus)
+        score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
+        score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
+        cont = f'{Command.perso_label(le_perso, userid)} {v} {Command.perso_label(lautre_perso, userid2)} ` {score_noms} ({score_valeurs} = {Command.str_sign(sign)}{mod})`'
         if bonus > 0:
             cont += f' avec {bonus} dé{"" if bonus == 1 else "s"} de bonus'
         if malus > 0:
@@ -490,7 +535,7 @@ class BoLClient(discord.Client):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
             self.add_perso(pj)
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe))
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe))
         
     def add_perso(self, p):
         self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p
