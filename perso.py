@@ -10,6 +10,7 @@ import re
 import os
 import os.path
 import copy
+import regles 
 
 def load(path):
     if os.path.isdir(path):
@@ -62,6 +63,7 @@ class Perso:
         self.langues = Ref([])
         self.attributs = Attributs()
         self.aptitudes_combat = AptitudesCombat(self.attributs)
+        self.armure = Ref(0)
         self.carrieres = collections.OrderedDict()
         self.avantages = Ref([])
         self.desavantages = Ref([])
@@ -83,6 +85,8 @@ class Perso:
         self._add_ref_map(self.aptitudes_combat.melee, 'mélée', 'mélee', 'melée', 'melee', 'mel', 'me')
         self._add_ref_map(self.aptitudes_combat.tir, 'tir', 'ti', 't')
         self._add_ref_map(self.aptitudes_combat.defense, 'défense', 'defense', 'déf', 'def', 'd')
+        self._add_ref_map(self.armure, 'armure')
+        self._add_ref_map(Ref(0), 'vigueur/2')
         self._add_ref_map(self.avantages, 'avantages', 'avantage', 'av')
         self._add_ref_map(self.desavantages, 'désavantages', 'desavantages', 'désavantage', 'desavantage', 'défauts', 'defauts', 'défaut', 'defaut')
         self._add_ref_map(self.pouvoir, 'pouvoir', 'pou')
@@ -126,6 +130,8 @@ class Perso:
                     ref.value = int(v)
                     if ref.modifiable:
                         ref.max = ref.value
+                    if ref == self.attributs.vigueur:
+                        self.ref_map['vigueur/2'].value = int(ref.value * 0.5)
                 except ValueError:
                     ref.value = v
         else:
