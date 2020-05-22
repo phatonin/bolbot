@@ -65,12 +65,12 @@ class Parser:
 
     def les_persos(self):
         result = list((p, u) for p, u in reversed(self.persos) if p is not None)
-        result.append((p, u) for p, u in reversed(self.persos) if p is None and u is not None)
-        result.append(((None, None), (None, None)))
+        result.extend((p, u) for p, u in reversed(self.persos) if p is None and u is not None)
+        result.extend(((None, None), (None, None)))
         return result
     
     def le_perso(self):
-        return self.les_persos()[(self.n_perso-1)]
+        return self.les_persos()[self.n_perso-1]
     
     def lautre_perso(self):
         return self.les_persos()[0]
@@ -627,7 +627,7 @@ class CommandListe(Command):
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
     
-    def __init__(self, pj_path):
+    def __init__(self, pj_path, pnj_path):
         discord.Client.__init__(self)
         self.message_queue = []
         self.pj_par_userid = {}
@@ -637,6 +637,8 @@ class BoLClient(discord.Client):
             userid = int(os.path.basename(path)[:-4])
             self.pj_par_userid[userid] = pj
             self.add_perso(pj)
+        for pnj, path in perso.load(pnj_path):
+            self.add_perso(pnj)
         self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe))
         
     def add_perso(self, p):
@@ -676,9 +678,10 @@ class BoLClient(discord.Client):
                     self.message_queue.append(reply)
                 break
         else:
-            print (f'{message}\n    {message.content}')
+            pass
+            #print (f'{message}\n    {message.content}')
 
-client = BoLClient('data/PJ')
+client = BoLClient('data/PJ', 'data/PNJ')
 print (client.persos_par_nom)
 print (client.pj_par_userid)
 client.run(TOKEN)
