@@ -74,7 +74,18 @@ class Parser:
     
     def lautre_perso(self):
         return self.les_persos()[0]
-
+    
+    def auth_perso(self, message, le_perso=None, userid=None):
+        if le_perso is None and userid is None:
+            le_perso, userid = self.le_perso()
+        if message.author.id == self.client.mj_userid:
+            return True
+        if userid is not None and userid == message.author.id:
+            return True
+        if le_perso is self.client.persos_par_nom[message.author.id]:
+            return True
+        return False
+    
     @staticmethod
     def _skip_ws(s, pos):
         m = Parser.WS.match(s, pos=pos)
@@ -171,9 +182,16 @@ class Parser:
 
 class Command:
     DIGITS = (None, '<:die_1:710969366786867230>', '<:die_2:710969366794993724>', '<:die_3:710969366925279273>', '<:die_4:710969366644260975>', '<:die_5:710969366417506386>', '<:die_6:710969366421700662>')
+    MJ_ONLY_MESSAGE = ':no_entry: :raised_hand: :stop_sign: :middle_finger: :no_pedestrians:'
 
-    def __init__(self, client):
+    def __init__(self, client, mj_command=True):
         self.client = client
+        self.mj_command = mj_command
+
+    async def auth_reply(self, message):
+        if self.mj_command and message.author.id != self.client.mj_userid:
+            return (Command.MJ_ONLY_MESSAGE,)
+        return await self.get_reply(message)
 
     async def get_reply(self, message):
         raise NotImplementedError()
@@ -269,13 +287,15 @@ class LanceParser(LanceJetParser):
 
 class CommandLance(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, False)
         
     async def get_reply(self, message):
         if not message.content.startswith('lance'):
             return ()
         parser = LanceParser(self.client, message.author.id)
         des, dice, result, scores, poubelle = parser.parse(message.content[5:])
+        if not parser.auth_perso(message):
+            return (Command.MJ_ONLY_MESSAGE,)
         if parser.dice is None:
             return (':warning: Lance quoi?',)
         score_total, sign, mod = regles.sum_scores(scores)
@@ -312,7 +332,7 @@ class JetParser(LanceJetParser):
 
 class CommandJet(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, False)
 
     async def get_reply(self, message):
         if not message.content.startswith('jet'):
@@ -322,6 +342,8 @@ class CommandJet(Command):
         le_perso, userid = parser.le_perso()
         if le_perso is None:
             return (':warning: Qui?',)
+        if not parser.auth_perso(message, le_perso, userid):
+            return (Command.MJ_ONLY_MESSAGE,)
         sign, mod, dice, result, reussite = regles.jet(scores, bonus, malus)
         score_noms = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.name.capitalize()}' for i, (s, score) in enumerate(scores))
         score_valeurs = ' '.join(f'{Command.str_sign(s) if i > 0 or s < 0 else ""} {score.value}' for i, (s, score) in enumerate(scores))
@@ -424,7 +446,7 @@ class FrappeParser(JetParser):
 
 class CommandFrappe(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, False)
 
     async def get_reply(self, message):
         if message.content.startswith('frappe'):
@@ -438,6 +460,8 @@ class CommandFrappe(Command):
         parser = FrappeParser(self.client, message.author.id)
         parser.parse(message.content[skip:])
         le_perso, userid = parser.le_perso()
+        if not parser.auth_perso(message, le_perso, userid):
+            return (Command.MJ_ONLY_MESSAGE,)
         lautre_perso, userid2 = parser.lautre_perso()
         if le_perso is None:
             return (':warning: Qui frappe?',)
@@ -482,7 +506,7 @@ class CommandFrappe(Command):
 
 class CommandPurge(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, True)
         
     async def get_reply(self, message):
         if message.content != 'purge':
@@ -501,13 +525,15 @@ class FDPParser(Parser):
 
 class CommandFDP(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, False)
         
     async def get_reply(self, message):
         if not message.content.startswith('fdp'):
             return ()
         parser = FDPParser(self.client, message.author.id)
         le_perso, userid = parser.parse(message.content[3:])
+        if not parser.auth_perso(message, le_perso, userid):
+            return (Command.MJ_ONLY_MESSAGE,)
         if le_perso is None:
             return (':warning: Qui?',)
         return (f'Fiche de perso de {Command.perso_label(le_perso, userid)}\n{le_perso.fiche()}',)
@@ -536,7 +562,7 @@ class PerdGagneParser(LanceParser):
 
 class CommandPerdGagne(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, True)
         
     async def get_reply(self, message):
         if message.content.startswith('perd'):
@@ -574,7 +600,7 @@ class CommandPNJ(Command):
         Command.__init__(self, client)
         
     async def get_reply(self, message):
-        if not message.content.startswith('pnj'):
+        if not message.content.startswith('pnj', True):
             return ()
         pnj = perso.Perso()
         for line in message.content[3:].split('\n'):
@@ -598,7 +624,7 @@ class CommandClone(Command):
         Command.__init__(self, client)
     
     async def get_reply(self, message):
-        if not message.content.startswith('clone'):
+        if not message.content.startswith('clone', True):
             return ()
         parser = CloneParser(client, message.author.id)
         le_perso, nombre = parser.parse(message.content[5:])
@@ -619,7 +645,7 @@ class CommandListe(Command):
         Command.__init__(self, client)
         
     async def get_reply(self, message):
-        if not message.content.startswith('liste'):
+        if not message.content.startswith('liste', True):
             return ()
         return ('\n'.join(f'**{p.nom.value}** ({p.niveau.value})' for p in sorted(self.client.persos_par_nom.values(), key=(lambda p: p.niveau.value))),)
             
@@ -627,11 +653,13 @@ class CommandListe(Command):
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
     
-    def __init__(self, pj_path, pnj_path):
+    def __init__(self, mj_file, pj_path, pnj_path):
         discord.Client.__init__(self)
         self.message_queue = []
         self.pj_par_userid = {}
         self.persos_par_nom = {}
+        with open(mj_file) as f:
+            self.mj_userid = int(f.read().strip())
         for pj, path in perso.load(pj_path):
             pj.niveau.value = 'pj'
             userid = int(os.path.basename(path)[:-4])
@@ -670,7 +698,7 @@ class BoLClient(discord.Client):
         if message.author.bot:
             return
         for cmd in self.commands:
-            contents = await cmd.get_reply(message)
+            contents = await cmd.auth_reply(message)
             if len(contents) > 0:
                 self.message_queue.append(message)
                 for content in contents:
@@ -681,7 +709,7 @@ class BoLClient(discord.Client):
             pass
             #print (f'{message}\n    {message.content}')
 
-client = BoLClient('data/PJ', 'data/PNJ')
+client = BoLClient('data/MJ', 'data/PJ', 'data/PNJ')
 print (client.persos_par_nom)
 print (client.pj_par_userid)
 client.run(TOKEN)
