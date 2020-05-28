@@ -196,6 +196,9 @@ class Command:
     async def get_reply(self, message):
         raise NotImplementedError()
     
+    def help(self):
+        return f'{self} help not available'
+    
     @staticmethod
     def perso_label(p, userid):
         if userid is None:
@@ -308,6 +311,9 @@ class CommandLance(Command):
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{final}**'
         return (cont,)
+    
+    def help(self):
+        return '`lance NdX [SCORES] [+|-N] [bonus|malus]`\nLance `N` dés de type `X`. Applique aussi les modificateur `SCORES` (attribut, aptitude de combat ou carrière), `+N` ou `-N` et les dés de `bonus` ou `malus`.\nLe bot répond avec les dés lancés et le résultat numérique.'
         
 class JetParser(LanceJetParser):
     def __init__(self, client, userid, n_perso=1):
@@ -357,6 +363,9 @@ class CommandJet(Command):
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{result}** **{reussite.name.capitalize()}**'
         return (cont,)
+    
+    def help(self):
+        return '`jet [PERSO] [ATTRIBUT] [APTITUDE] [CARRIÈRE] [+|- N] [bonus|malus]`\nEffectue un jet pour son personage (ou `PERSO`) avec les scores `ATTRIBUT`, `APTITUDE` (de combat) et/ou `CARRIÈRE`. Applique aussi le modificateur `+N` ou `-N` et les dés de `bonus` ou `malus`.\nLe bot répond avec les dés lancés, le résultat numérique et si le jet est réussi ou non.'
 
 class Arme:
     TOUTES = collections.OrderedDict()
@@ -452,8 +461,8 @@ class CommandFrappe(Command):
         if message.content.startswith('frappe'):
             skip = 6
             apt = 'melee'
-        elif message.content.startswith('tir'):
-            skip = 3
+        elif message.content.startswith('tire'):
+            skip = 4
             apt = 'tir'
         else:
             return ()
@@ -503,6 +512,9 @@ class CommandFrappe(Command):
             lautre_perso.vitalite.value -= dg_result
             cont += f'{Command.perso_label(lautre_perso, userid2)}: {lautre_perso.vitalite.value} PV {"" if lautre_perso.vitalite.value > 0 else ":skull_crossbones:"}'
         return (cont,)
+    
+    def help(self):
+        return '`frappe|tire [ATT] DÉF ARME`\nEffectue une frappe avec son perso (ou `ATT`) sur le personnage `DÉF` avec l\'arme `ARME`. Le bot effectue un jet de l\'aptitude de combat approprié, si le jet est réussi alors le bot effectue un jet de dommages et retire la vitalité.'
 
 class CommandPurge(Command):
     def __init__(self, client):
@@ -515,6 +527,9 @@ class CommandPurge(Command):
         n = len(self.client.message_queue)
         self.client.message_queue = []
         return (f':x: {n} messages supprimés',)
+    
+    def help(self):
+        return '`purge`\nSupprime les messages de ce bot ainsi que les requêtes des PJ/MJ.'
 
 class FDPParser(Parser):
     def __init__(self, client, userid):
@@ -537,6 +552,9 @@ class CommandFDP(Command):
         if le_perso is None:
             return (':warning: Qui?',)
         return (f'Fiche de perso de {Command.perso_label(le_perso, userid)}\n{le_perso.fiche()}',)
+    
+    def help(self):
+        return '`fdp [PERSO]`\nAffiche une jolie fiche de personnage pour son perso (ou celui de `PERSO`).'
 
 class PerdGagneParser(LanceParser):
     def __init__(self, client, userid):
@@ -594,6 +612,9 @@ class CommandPerdGagne(Command):
         score.value = max(min(int(score.value) + sign_global * final, score.max), 0)
         cont += f'\n**{final}**\n**{score.name.capitalize()} = {score.value}**'
         return (cont,)
+    
+    def help(self):
+        return '`perd|gagne [PERSO] SCORE [N] [DÉS]`\nModifie un score `SCORE` de son perso (ou celui de `PERSO`). L\'utilisation de `perd` diminue le score, alors que `gagne` augmente le score.\nLa quantité perdue ou gagnée est soit un nombre (`N`) soit une expression de dés (`DÉS`)'
 
 class CommandPNJ(Command):
     def __init__(self, client):
@@ -607,6 +628,9 @@ class CommandPNJ(Command):
             pnj.parse_line(line.strip())
         self.client.add_perso(pnj)
         return (f'Fiche de perso de {Command.perso_label(pnj, None)}\n{pnj.fiche()}',)
+    
+    def help(self):
+        return '`pnj ...`\nCrée un nouveau PNJ. La suite du message doit être sous la forme `STAT: VALEUR` ou `NIVEAU NOM VAEA IMTD VIT`.'
 
 class CloneParser(Parser):
     def __init__(self, client, userid):
@@ -639,16 +663,33 @@ class CommandClone(Command):
             noms.append(pnj.nom.value)
             self.client.add_perso(pnj)
         return (f'Le personnage {Command.perso_label(le_perso, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
+    
+    def help(self):
+        return '`clone PERSO N`\nCrée `N` copies exactes du personage `PERSO`. Le nom de chacun des personages issues de la copie est augmenté d\'un nombre de 2 à `N`.'
 
 class CommandListe(Command):
     def __init__(self, client):
-        Command.__init__(self, client)
+        Command.__init__(self, client, True)
         
     async def get_reply(self, message):
-        if not message.content.startswith('liste', True):
+        if not message.content.startswith('liste'):
             return ()
         return ('\n'.join(f'**{p.nom.value}** ({p.niveau.value})' for p in sorted(self.client.persos_par_nom.values(), key=(lambda p: p.niveau.value))),)
-            
+
+    def help(self):
+        return '`liste`\nAffiche la liste des personnages que ce bot connait.'
+
+class CommandAide(Command):
+    def __init__(self, client):
+        Command.__init__(self, client, False)
+        
+    async def get_reply(self, message):
+        if not message.content.startswith('aide'):
+            return ()
+        return ('\n\n'.join(c.help() for c in self.client.commands if message.author.id == self.client.mj_userid or not c.mj_command),)
+    
+    def help(self):
+        return '`aide`\nAffiche cette aide.'
 
 class BoLClient(discord.Client):
     NON_ALNUM_PATTERN = re.compile('[\W_]+')
@@ -667,7 +708,7 @@ class BoLClient(discord.Client):
             self.add_perso(pj)
         for pnj, path in perso.load(pnj_path):
             self.add_perso(pnj)
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe))
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe, CommandAide))
         
     def add_perso(self, p):
         self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p
