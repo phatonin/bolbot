@@ -6,6 +6,7 @@ Created on May 5, 2020
 
 import random
 import re
+import util
 
 DICE_PATTERN = re.compile(r'(?P<dice_number>\d+)d(?P<dice_type>\d+)(?P<additional>[MB]*)', re.RegexFlag.IGNORECASE)
 
@@ -15,8 +16,8 @@ def parse_dice(expr):
         return {
             'dice_number': int(m.group('dice_number')),
             'dice_type': int(m.group('dice_type')),
-            'bonus': m.group('additional').count('B'),
-            'malus': m.group('additional').count('M'),
+            'bonus': m.group('additional').lower().count('b'),
+            'malus': m.group('additional').lower().count('m'),
         }
     raise ValueError(expr)
 
@@ -58,17 +59,17 @@ class Difficulte:
         self.sign = sign
         self.mod = mod
         self.name = name
-        Difficulte.MAP[name] = self
+        Difficulte.MAP[util.snorm(name)] = self
         for k in keys:
-            Difficulte.MAP[k] = self
-Difficulte.TRES_FACILE = Difficulte(1, 2, 'très facile', 'tres facile', 'tresfacile', 'tfacile', 'tfac')
+            Difficulte.MAP[util.snorm(k)] = self
+Difficulte.TRES_FACILE = Difficulte(1, 2, 'très facile', 'tfacile', 'tfac')
 Difficulte.FACILE = Difficulte(1, 1, 'facile', 'fac')
 Difficulte.MOYENNE = Difficulte(1, 0, 'moyenne', 'moy')
 Difficulte.ARDUE = Difficulte(-1, 1, 'ardue', 'ard', 'hard')
 Difficulte.DIFFICILE = Difficulte(-1, 2, 'difficile', 'diff')
-Difficulte.TRES_DIFFICILE = Difficulte(-1, 4, 'très difficile', 'tres difficile', 'tresdifficile', 'tdifficile', 'tdiff')
+Difficulte.TRES_DIFFICILE = Difficulte(-1, 4, 'très difficile', 'tresdifficile', 'tdifficile', 'tdiff')
 Difficulte.IMPOSSIBLE = Difficulte(-1, 6, 'impossible', 'impo')
-Difficulte.HEROIQUE = Difficulte(-1, 8, 'héroïque', 'héroique', 'heroïque', 'heroique')
+Difficulte.HEROIQUE = Difficulte(-1, 8, 'héroïque')
 
 def _try_int(v):
     try:

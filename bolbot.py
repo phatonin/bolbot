@@ -6,6 +6,7 @@ import dotenv
 import re
 import perso
 import regles
+import util
 import collections
 
 dotenv.load_dotenv()
@@ -153,18 +154,19 @@ class Parser:
         self.ignorer(raw)
     
     def _junk(self, raw):
-        if raw.lower() in regles.Difficulte.MAP:
+        if util.snorm(raw) in regles.Difficulte.MAP:
             self.difficulte(raw, regles.Difficulte.MAP[raw])
         elif self.client.has_perso(raw):
             self.persos.append((self.client.get_perso(raw), None))
         else:
             le_perso, _uid = self.le_perso()
             if le_perso is not None:
-                if raw.lower() in le_perso.ref_map:
+                norm = util.snorm(raw)
+                if norm in le_perso.ref_map:
                     self.score(raw, le_perso.ref_map[raw])
-                elif raw.lower() in le_perso.avantages.value:
+                elif norm in le_perso.avantages.value:
                     self.bonus(raw)
-                elif raw.lower() in le_perso.desavantages.value:
+                elif norm in le_perso.desavantages.value:
                     self.malus(raw)
                 else:
                     self.junk(raw)
@@ -236,9 +238,9 @@ class LanceJetParser(Parser):
 
     def number(self, raw, number):
         if number < 0:
-            self.ajouter(raw, perso.Ref(abs(number), raw), -1)
+            self.ajouter(raw, util.Ref(abs(number), raw), -1)
         else:
-            self.ajouter(raw, perso.Ref(number, raw))
+            self.ajouter(raw, util.Ref(number, raw))
         self.current_sign = 1
 
     def sign(self, raw, sign):
@@ -249,7 +251,7 @@ class LanceJetParser(Parser):
         self.current_sign = 1
 
     def difficulte(self, raw, difficulte):
-        self.ajouter(raw, perso.Ref(difficulte.mod, difficulte.name), difficulte.sign)
+        self.ajouter(raw, util.Ref(difficulte.mod, difficulte.name), difficulte.sign)
         self.current_sign = 1
 
     def score(self, raw, ref):
@@ -375,9 +377,9 @@ class Arme:
         self.degats = degats
         self.aptitude = aptitude
         self.parsed_degats = regles.parse_dice(degats)
-        Arme.TOUTES[name.lower()] = self
+        Arme.TOUTES[util.snorm(name)] = self
         for k in keys:
-            Arme.TOUTES[k.lower()] = self
+            Arme.TOUTES[util.snorm(k)] = self
         self.keys = keys
     
     def bonus_vigueur(self, aptitude):
@@ -692,8 +694,6 @@ class CommandAide(Command):
         return '`aide`\nAffiche cette aide.'
 
 class BoLClient(discord.Client):
-    NON_ALNUM_PATTERN = re.compile('[\W_]+')
-    
     def __init__(self, mj_file, pj_path, pnj_path):
         discord.Client.__init__(self)
         self.message_queue = []
@@ -711,18 +711,14 @@ class BoLClient(discord.Client):
         self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe, CommandAide))
         
     def add_perso(self, p):
-        self.persos_par_nom[BoLClient._nom_canon(p.nom.value)] = p
+        self.persos_par_nom[util.snorm(p.nom.value)] = p
         
     def get_perso(self, nom):
-        return self.persos_par_nom[BoLClient._nom_canon(nom)]
+        return self.persos_par_nom[util.snorm(nom)]
     
     def has_perso(self, nom):
-        return BoLClient._nom_canon(nom) in self.persos_par_nom
+        return util.snorm(nom) in self.persos_par_nom
         
-    @staticmethod
-    def _nom_canon(nom):
-        return BoLClient.NON_ALNUM_PATTERN.sub('', nom).lower()
-    
     async def on_ready(self):
         print (f'{self.user} has connected to Discord!')
     
