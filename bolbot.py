@@ -1,4 +1,4 @@
-#!/bin/env python3.6
+#!/bin/env python3
 
 import os
 import discord
@@ -69,13 +69,13 @@ class Parser:
         result.extend((p, u) for p, u in reversed(self.persos) if p is None and u is not None)
         result.extend(((None, None), (None, None)))
         return result
-    
+
     def le_perso(self):
-        return self.les_persos()[self.n_perso-1]
-    
+        return self.les_persos()[self.n_perso - 1]
+
     def lautre_perso(self):
         return self.les_persos()[0]
-    
+
     def auth_perso(self, message, le_perso=None, userid=None):
         if le_perso is None and userid is None:
             le_perso, userid = self.le_perso()
@@ -86,12 +86,12 @@ class Parser:
         if le_perso is self.client.persos_par_nom[message.author.id]:
             return True
         return False
-    
+
     @staticmethod
     def _skip_ws(s, pos):
         m = Parser.WS.match(s, pos=pos)
         return pos + len(m.group())
-        
+
     def parse(self, s):
         pos = 0
         while pos < len(s):
@@ -105,54 +105,54 @@ class Parser:
                     getattr(self, '_' + meth)(raw, **args)
                     break
         return self.finish()
-    
+
     def finish(self):
         raise NotImplementedError()
-                
+
     def _mention(self, raw, userid):
         self.mention(raw, int(userid))
-    
+
     def mention(self, raw, userid):
         if userid in self.client.pj_par_userid:
             p = self.client.pj_par_userid[userid]
         else:
             p = None
         self.persos.append((p, userid))
-    
+
     def _dice(self, raw, dice_number=1, dice_type=6, additional=''):
         ladditional = additional.lower()
         self.dice(raw, int(dice_number), int(dice_type), ladditional.count('b'), ladditional.count('m'))
-        
+
     def dice(self, raw, dice_number, dice_type, bonus, malus):
         self.ignorer(raw)
-    
+
     def _number(self, raw, number):
         self.number(raw, int(number))
-        
+
     def number(self, raw, number):
         self.ignorer(raw)
-        
+
     def _sign(self, raw, sign):
         if sign == '+':
             self.sign(raw, 1)
         elif sign == '-':
             self.sign(raw, -1)
-    
+
     def sign(self, raw, sign):
         self.ignorer(raw)
-    
+
     def _bonus(self, raw):
         self.bonus(raw)
-        
+
     def bonus(self, raw):
         self.ignorer(raw)
-        
+
     def _malus(self, raw):
         self.malus(raw)
-    
+
     def malus(self, raw):
         self.ignorer(raw)
-    
+
     def _junk(self, raw):
         if util.snorm(raw) in regles.Difficulte.MAP:
             self.difficulte(raw, regles.Difficulte.MAP[raw])
@@ -175,12 +175,13 @@ class Parser:
 
     def difficulte(self, raw, difficulte):
         self.ignorer(raw)
-    
+
     def score(self, raw, ref):
         self.ignorer(raw)
-    
+
     def junk(self, raw):
         self.ignorer(raw)
+
 
 class Command:
     DIGITS = (None, '<:die_1:710969366786867230>', '<:die_2:710969366794993724>', '<:die_3:710969366925279273>', '<:die_4:710969366644260975>', '<:die_5:710969366417506386>', '<:die_6:710969366421700662>')
@@ -197,10 +198,10 @@ class Command:
 
     async def get_reply(self, message):
         raise NotImplementedError()
-    
+
     def help(self):
         return f'{self} help not available'
-    
+
     @staticmethod
     def perso_label(p, userid):
         if userid is None:
@@ -209,23 +210,24 @@ class Command:
             return f'<@!{userid}>'
         return f'**{p.nom}** (<@!{userid}>)'
 
-    @staticmethod    
+    @staticmethod
     def str_sign(n):
         if n == 1:
             return '+'
         if n == -1:
             return '-'
 
-    @staticmethod    
+    @staticmethod
     def dice_icons(dice):
         return ' '.join(Command.DIGITS[n] for n in dice)
- 
+
+
 class LanceJetParser(Parser):
     def __init__(self, client, userid, n_perso=1):
         Parser.__init__(self, client, userid, n_perso)
         self.scores = []
         self.current_sign = 1
-        
+
     def ajouter(self, raw, ref, signe=None):
         if signe is None:
             signe = self.current_sign
@@ -270,7 +272,7 @@ class LanceParser(LanceJetParser):
         self.des = None
         self.rolls = None
         self.result = None
-        
+
     def finish(self):
         return self.des, self.rolls, self.result, self.scores, self.poubelle
 
@@ -290,10 +292,11 @@ class LanceParser(LanceJetParser):
         LanceJetParser.malus(self, raw)
         self.current_sign = 1
 
+
 class CommandLance(Command):
     def __init__(self, client):
         Command.__init__(self, client, False)
-        
+
     async def get_reply(self, message):
         if not message.content.startswith('lance'):
             return ()
@@ -313,20 +316,21 @@ class CommandLance(Command):
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{final}**'
         return (cont,)
-    
+
     def help(self):
         return '`lance NdX [SCORES] [+|-N] [bonus|malus]`\nLance `N` dés de type `X`. Applique aussi les modificateur `SCORES` (attribut, aptitude de combat ou carrière), `+N` ou `-N` et les dés de `bonus` ou `malus`.\nLe bot répond avec les dés lancés et le résultat numérique.'
-        
+
+
 class JetParser(LanceJetParser):
     def __init__(self, client, userid, n_perso=1):
         LanceJetParser.__init__(self, client, userid, n_perso)
         self.n_bonus = 0
         self.n_malus = 0
-        
+
     def finish(self):
         return self.scores, self.n_bonus, self.n_malus, self.poubelle
 
-    def dice(self, raw, dice_number, dice_type, bonus, malus):  
+    def dice(self, raw, dice_number, dice_type, bonus, malus):
         self.ignorer(raw)
         self.current_sign = 1
 
@@ -365,13 +369,14 @@ class CommandJet(Command):
         cont += f'\n{Command.dice_icons(dice)}\n'
         cont += f'**{result}** **{reussite.name.capitalize()}**'
         return (cont,)
-    
+
     def help(self):
         return '`jet [PERSO] [ATTRIBUT] [APTITUDE] [CARRIÈRE] [+|- N] [bonus|malus]`\nEffectue un jet pour son personage (ou `PERSO`) avec les scores `ATTRIBUT`, `APTITUDE` (de combat) et/ou `CARRIÈRE`. Applique aussi le modificateur `+N` ou `-N` et les dés de `bonus` ou `malus`.\nLe bot répond avec les dés lancés, le résultat numérique et si le jet est réussi ou non.'
 
+
 class Arme:
     TOUTES = collections.OrderedDict()
-    
+
     def __init__(self, name, degats, aptitude, *keys):
         self.name = name
         self.degats = degats
@@ -381,41 +386,45 @@ class Arme:
         for k in keys:
             Arme.TOUTES[util.snorm(k)] = self
         self.keys = keys
-    
+
     def bonus_vigueur(self, aptitude):
-        raise NotImplemented()
+        raise NotImplementedError()
+
 
 class MainsNues(Arme):
     def __init__(self, name, *keys):
         Arme.__init__(self, name, '1d3', 'melee', *keys)
-        
+
     def bonus_vigueur(self, aptitude):
         return 'vigueur/2'
-    
+
+
 class ArmeOutil(Arme):
     def __init__(self, name, degats, aptitude, *keys):
         Arme.__init__(self, name, degats, aptitude, *keys)
-        
+
     def bonus_vigueur(self, aptitude):
         if aptitude == 'melee':
             return 'vigueur'
         return 'vigueur/2'
-    
+
 class ArmeImprovisee(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d3', aptitude, *keys)
-        
+
 class ArmeLegere(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d6M', aptitude, *keys)
-        
+
 class ArmeMoyenne(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d6', aptitude, *keys)
-        
+
+
 class ArmeLourde(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d6B', aptitude, *keys)
+
 
 MainsNues('mains nues', 'mainsnues', 'mains', 'poings', 'pieds', 'main', 'poing', 'pied', 'rien', 'aucune')
 ArmeImprovisee('arme improvisée', None, 'improvisée', 'improvisee', 'impro', 'caillou', 'pierre')
@@ -443,17 +452,19 @@ ArmeLourde('grande hache', 'melee', 'grande')
 ArmeLourde('morgenstern', 'melee')
 ArmeLourde('arbalète lourde', 'tir', 'balliste')
 
+
 class FrappeParser(JetParser):
     def __init__(self, client, userid):
         JetParser.__init__(self, client, userid, 2)
         self.arme = None
-        
+
     def junk(self, raw):
         if raw in Arme.TOUTES:
             self.arme = raw
         else:
             self.ignorer(raw)
         self.current_sign = 1
+
 
 class CommandFrappe(Command):
     def __init__(self, client):
@@ -514,14 +525,15 @@ class CommandFrappe(Command):
             lautre_perso.vitalite.value -= dg_result
             cont += f'{Command.perso_label(lautre_perso, userid2)}: {lautre_perso.vitalite.value} PV {"" if lautre_perso.vitalite.value > 0 else ":skull_crossbones:"}'
         return (cont,)
-    
+
     def help(self):
         return '`frappe|tire [ATT] DÉF ARME`\nEffectue une frappe avec son perso (ou `ATT`) sur le personnage `DÉF` avec l\'arme `ARME`. Le bot effectue un jet de l\'aptitude de combat approprié, si le jet est réussi alors le bot effectue un jet de dommages et retire la vitalité.'
+
 
 class CommandPurge(Command):
     def __init__(self, client):
         Command.__init__(self, client, True)
-        
+
     async def get_reply(self, message):
         if message.content != 'purge':
             return ()
@@ -529,21 +541,22 @@ class CommandPurge(Command):
         n = len(self.client.message_queue)
         self.client.message_queue = []
         return (f':x: {n} messages supprimés',)
-    
+
     def help(self):
         return '`purge`\nSupprime les messages de ce bot ainsi que les requêtes des PJ/MJ.'
+
 
 class FDPParser(Parser):
     def __init__(self, client, userid):
         Parser.__init__(self, client, userid)
-        
+
     def finish(self):
         return self.le_perso()
 
 class CommandFDP(Command):
     def __init__(self, client):
         Command.__init__(self, client, False)
-        
+
     async def get_reply(self, message):
         if not message.content.startswith('fdp'):
             return ()
@@ -554,9 +567,10 @@ class CommandFDP(Command):
         if le_perso is None:
             return (':warning: Qui?',)
         return (f'Fiche de perso de {Command.perso_label(le_perso, userid)}\n{le_perso.fiche()}',)
-    
+
     def help(self):
         return '`fdp [PERSO]`\nAffiche une jolie fiche de personnage pour son perso (ou celui de `PERSO`).'
+
 
 class PerdGagneParser(LanceParser):
     def __init__(self, client, userid):
@@ -576,14 +590,15 @@ class PerdGagneParser(LanceParser):
             self.current_sign = 1
         else:
             LanceParser.score(self, raw, ref)
-            
+
     def finish(self):
         return self.le_score, self.des, self.rolls, self.result, self.scores, self.poubelle
+
 
 class CommandPerdGagne(Command):
     def __init__(self, client):
         Command.__init__(self, client, True)
-        
+
     async def get_reply(self, message):
         if message.content.startswith('perd'):
             sign_global = -1
@@ -614,14 +629,15 @@ class CommandPerdGagne(Command):
         score.value = max(min(int(score.value) + sign_global * final, score.max), 0)
         cont += f'\n**{final}**\n**{score.name.capitalize()} = {score.value}**'
         return (cont,)
-    
+
     def help(self):
         return '`perd|gagne [PERSO] SCORE [N] [DÉS]`\nModifie un score `SCORE` de son perso (ou celui de `PERSO`). L\'utilisation de `perd` diminue le score, alors que `gagne` augmente le score.\nLa quantité perdue ou gagnée est soit un nombre (`N`) soit une expression de dés (`DÉS`)'
+
 
 class CommandPNJ(Command):
     def __init__(self, client):
         Command.__init__(self, client)
-        
+
     async def get_reply(self, message):
         if not message.content.startswith('pnj', True):
             return ()
@@ -630,9 +646,10 @@ class CommandPNJ(Command):
             pnj.parse_line(line.strip())
         self.client.add_perso(pnj)
         return (f'Fiche de perso de {Command.perso_label(pnj, None)}\n{pnj.fiche()}',)
-    
+
     def help(self):
         return '`pnj ...`\nCrée un nouveau PNJ. La suite du message doit être sous la forme `STAT: VALEUR` ou `NIVEAU NOM VAEA IMTD VIT`.'
+
 
 class CloneParser(Parser):
     def __init__(self, client, userid):
@@ -641,14 +658,15 @@ class CloneParser(Parser):
 
     def number(self, raw, number):
         self.nombre = number
-        
+
     def finish(self):
         return self.le_perso()[0], self.nombre
+
 
 class CommandClone(Command):
     def __init__(self, client):
         Command.__init__(self, client)
-    
+
     async def get_reply(self, message):
         if not message.content.startswith('clone', True):
             return ()
@@ -661,18 +679,19 @@ class CommandClone(Command):
         noms = []
         for n in range(nombre):
             pnj = le_perso.clone()
-            pnj.nom.value += str(n+2)
+            pnj.nom.value += str(n + 2)
             noms.append(pnj.nom.value)
             self.client.add_perso(pnj)
         return (f'Le personnage {Command.perso_label(le_perso, None)} a été cloné {nombre} fois\n{", ".join(noms)}',)
-    
+
     def help(self):
         return '`clone PERSO N`\nCrée `N` copies exactes du personage `PERSO`. Le nom de chacun des personages issues de la copie est augmenté d\'un nombre de 2 à `N`.'
+
 
 class CommandListe(Command):
     def __init__(self, client):
         Command.__init__(self, client, True)
-        
+
     async def get_reply(self, message):
         if not message.content.startswith('liste'):
             return ()
@@ -681,17 +700,19 @@ class CommandListe(Command):
     def help(self):
         return '`liste`\nAffiche la liste des personnages que ce bot connait.'
 
+
 class CommandAide(Command):
     def __init__(self, client):
         Command.__init__(self, client, False)
-        
+
     async def get_reply(self, message):
         if not message.content.startswith('aide'):
             return ()
         return ('\n\n'.join(c.help() for c in self.client.commands if message.author.id == self.client.mj_userid or not c.mj_command),)
-    
+
     def help(self):
         return '`aide`\nAffiche cette aide.'
+
 
 class BoLClient(discord.Client):
     def __init__(self, mj_file, pj_path, pnj_path):
@@ -709,28 +730,28 @@ class BoLClient(discord.Client):
         for pnj, path in perso.load(pnj_path):
             self.add_perso(pnj)
         self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe, CommandAide))
-        
+
     def add_perso(self, p):
         self.persos_par_nom[util.snorm(p.nom.value)] = p
-        
+
     def get_perso(self, nom):
         return self.persos_par_nom[util.snorm(nom)]
-    
+
     def has_perso(self, nom):
         return util.snorm(nom) in self.persos_par_nom
-        
+
     async def on_ready(self):
-        print (f'{self.user} has connected to Discord!')
-    
+        print(f'{self.user} has connected to Discord!')
+
     async def on_error(self, event, *args, **_):
         if event == 'on_message':
-            print (f'Unhandled message: {args[0]}')
+            print(f'Unhandled message: {args[0]}')
         raise
-    
+
     async def reply(self, message, content):
         r = await message.channel.send(content)
         self.message_queue.append(r)
-        
+
     async def on_message(self, message):
         if message.author.bot:
             return
@@ -744,9 +765,9 @@ class BoLClient(discord.Client):
                 break
         else:
             pass
-            #print (f'{message}\n    {message.content}')
+
 
 client = BoLClient('data/MJ', 'data/PJ', 'data/PNJ')
-print (client.persos_par_nom)
-print (client.pj_par_userid)
+print(client.persos_par_nom)
+print(client.pj_par_userid)
 client.run(TOKEN)
