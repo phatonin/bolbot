@@ -266,6 +266,7 @@ class LanceJetParser(Parser):
                 self.ignorer(raw)
         self.current_sign = 1
 
+
 class LanceParser(LanceJetParser):
     def __init__(self, client, userid):
         LanceJetParser.__init__(self, client, userid)
@@ -342,6 +343,7 @@ class JetParser(LanceJetParser):
         self.n_malus += 1
         self.current_sign = 1
 
+
 class CommandJet(Command):
     def __init__(self, client):
         Command.__init__(self, client, False)
@@ -408,13 +410,16 @@ class ArmeOutil(Arme):
             return 'vigueur'
         return 'vigueur/2'
 
+
 class ArmeImprovisee(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d3', aptitude, *keys)
 
+
 class ArmeLegere(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
         ArmeOutil.__init__(self, name, '1d6M', aptitude, *keys)
+
 
 class ArmeMoyenne(ArmeOutil):
     def __init__(self, name, aptitude, *keys):
@@ -552,6 +557,7 @@ class FDPParser(Parser):
 
     def finish(self):
         return self.le_perso()
+
 
 class CommandFDP(Command):
     def __init__(self, client):

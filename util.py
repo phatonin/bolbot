@@ -15,22 +15,23 @@ def log(msg):
     sys.stderr.write(msg + '\n')
     sys.stderr.flush()
 
+
 class Ref:
     def __init__(self, value, name=None, auto_ref=None, modifiable=False):
         self.value = value
         self.name = name
         self.auto_ref = auto_ref
         self.modifiable = modifiable
-        
+
     def __str__(self):
         return str(self.value)
-    
+
     def __iadd__(self, other):
         self.value += other
-        
+
     def __isub__(self, other):
         self.value -= other
-        
+
     def is_int(self):
         try:
             int(self.value)
@@ -66,23 +67,21 @@ class Cell:
         else:
             r = self.text.ljust(w, self.fillchar)
         if self.left:
-            r = '| ' + r 
+            r = '| ' + r
         if self.right:
             r += ' |'
         return r
 
+
 HLine = [Cell(12, '', fillchar='-')]
 
 
-NON_ALNUM_PATTERN = re.compile('[\W_]+')
+NON_ALNUM_PATTERN = re.compile(r'[\W_]+')
+
+
 def snorm(s):
     spaces = ' '.join(s.split())
     diacritics = ''.join(c for c in unicodedata.normalize('NFKD', spaces) if not unicodedata.combining(c))
     special = NON_ALNUM_PATTERN.sub('', diacritics)
     lower = special.lower()
     return lower
-
-    
-    
-    
-    

@@ -12,6 +12,7 @@ import os
 import copy
 import util
 
+
 def load(path):
     if os.path.isdir(path):
         for fn in os.listdir(path):
@@ -20,14 +21,18 @@ def load(path):
         p = Perso()
         p.parse_file(path)
         yield p, path
-        
+
+
 class Niveau:
     def __init__(self, name):
         self.name = name
+
+
 Niveau.PJ = Niveau('pj')
 Niveau.Pietaille = Niveau('piétaille')
 Niveau.Coriace = Niveau('coriace')
 Niveau.Rival = Niveau('rival')
+
 
 class Perso:
     LINE_PATTERN = re.compile(r'(?P<k>\w+)\s*[:=]?\s*(?P<v>.+)', re.RegexFlag.IGNORECASE)
@@ -71,14 +76,14 @@ class Perso:
         self._add_ref_map(self.creation, 'création', 'creation', 'créa', 'crea', 'cré', 'cre')
         self._add_ref_map(self.vitalite, 'vitalité', 'vitalite', 'vit', 'vie', 'pv')
         self._add_ref_map(self.heroisme, 'héroïsme', 'héroisme', 'heroïsme', 'heroisme', 'héros', 'heros')
-        
+
     def clone(self, target=None):
         if target is None:
             target = Perso()
         for k, ref in self.ref_map.items():
             target.ref_map[k].value = copy.copy(ref.value)
         return target
-        
+
     def _add_ref_map(self, ref, *keys):
         for k in keys:
             if k in self.ref_map:
@@ -96,7 +101,7 @@ class Perso:
                 line = line.strip()
                 if line != '':
                     self.parse_line(line)
- 
+
     def setv(self, k, v):
         if k in self.ref_map:
             ref = self.ref_map[k]
@@ -134,86 +139,86 @@ class Perso:
 
     def fiche(self):
         titres = [
-                [
-                    util.Cell(12, f'{self.nom} ({self.niveau.value})'),
-                ],
-                [
-                    util.Cell(2, 'Origine'),
-                    util.Cell(10, self.origine),
-                ],
-                [
-                    util.Cell(2, 'Langues'),
-                    util.Cell(10, ', '.join(self.langues.value)),
-                ],
-                util.HLine,
-                [
-                    util.Cell(4, 'Attributs', center=True),
-                    util.Cell(4, 'Combat', left=True, center=True),
-                    util.Cell(4, 'Carrières', left=True, center=True),
-                ],
-            ]
+            [
+                util.Cell(12, f'{self.nom} ({self.niveau.value})'),
+            ],
+            [
+                util.Cell(2, 'Origine'),
+                util.Cell(10, self.origine),
+            ],
+            [
+                util.Cell(2, 'Langues'),
+                util.Cell(10, ', '.join(self.langues.value)),
+            ],
+            util.HLine,
+            [
+                util.Cell(4, 'Attributs', center=True),
+                util.Cell(4, 'Combat', left=True, center=True),
+                util.Cell(4, 'Carrières', left=True, center=True),
+            ],
+        ]
         scores = [
-                [
-                    util.Cell(3, 'Vigueur'),
-                    util.Cell(1, self.attributs.vigueur),
-                    util.Cell(3, 'Initiative', left=True),
-                    util.Cell(1, self.aptitudes_combat.initiative),
-                ],
-                [
-                    util.Cell(3, 'Agilité'),
-                    util.Cell(1, self.attributs.agilite),
-                    util.Cell(3, 'Mélée', left=True),
-                    util.Cell(1, self.aptitudes_combat.melee),
-                ],
-                [
-                    util.Cell(3, 'Esprit'),
-                    util.Cell(1, self.attributs.esprit),
-                    util.Cell(3, 'Tir', left=True),
-                    util.Cell(1, self.aptitudes_combat.tir),
-                ],
-                [
-                    util.Cell(3, 'Aura'),
-                    util.Cell(1, self.attributs.aura),
-                    util.Cell(3, 'Défense', left=True),
-                    util.Cell(1, self.aptitudes_combat.defense),
-                    # XXX carriere
-                ],
-            ]
+            [
+                util.Cell(3, 'Vigueur'),
+                util.Cell(1, self.attributs.vigueur),
+                util.Cell(3, 'Initiative', left=True),
+                util.Cell(1, self.aptitudes_combat.initiative),
+            ],
+            [
+                util.Cell(3, 'Agilité'),
+                util.Cell(1, self.attributs.agilite),
+                util.Cell(3, 'Mélée', left=True),
+                util.Cell(1, self.aptitudes_combat.melee),
+            ],
+            [
+                util.Cell(3, 'Esprit'),
+                util.Cell(1, self.attributs.esprit),
+                util.Cell(3, 'Tir', left=True),
+                util.Cell(1, self.aptitudes_combat.tir),
+            ],
+            [
+                util.Cell(3, 'Aura'),
+                util.Cell(1, self.attributs.aura),
+                util.Cell(3, 'Défense', left=True),
+                util.Cell(1, self.aptitudes_combat.defense),
+                # XXX carriere
+            ],
+        ]
         carrieres = list(self.carrieres.items())
         for i in range(0, min(4, len(carrieres))):
             c, n = carrieres[i]
             scores[i].extend([
-                    util.Cell(3, c.capitalize(), left=True),
-                    util.Cell(1, n)
-                ])
+                util.Cell(3, c.capitalize(), left=True),
+                util.Cell(1, n)
+            ])
         for i in range(len(carrieres), 4):
             scores[i].append(util.Cell(4, '', left=True))
         for i in range(4, len(carrieres)):
             c, n = carrieres[i]
             scores.append([
-                    util.Cell(8, ''),
-                    util.Cell(3, c.capitalize(), left=True),
-                    util.Cell(1, n)
-                ])
+                util.Cell(8, ''),
+                util.Cell(3, c.capitalize(), left=True),
+                util.Cell(1, n)
+            ])
         avantages = [
-                [
-                    util.Cell(6, 'Avantages', center=True, left=True),
-                    util.Cell(6, 'Désavantages', center=True, left=True),
-                ]
+            [
+                util.Cell(6, 'Avantages', center=True, left=True),
+                util.Cell(6, 'Désavantages', center=True, left=True),
             ]
+        ]
         for a, d in itertools.zip_longest(self.avantages.value, self.desavantages.value):
             avantages.append([
-                    util.Cell(6, '' if a is None else a.capitalize(), left=True),
-                    util.Cell(6, '' if d is None else d.capitalize(), left=True)
-                ])
+                util.Cell(6, '' if a is None else a.capitalize(), left=True),
+                util.Cell(6, '' if d is None else d.capitalize(), left=True)
+            ])
         gros_titres = [
-                    util.Cell(3, 'Vitalité', center=True),
-                    util.Cell(3, 'Héroïsme', center=True),
-                ]
+            util.Cell(3, 'Vitalité', center=True),
+            util.Cell(3, 'Héroïsme', center=True),
+        ]
         gros_scores = [
-                    util.Cell(3, self.vitalite, center=True),
-                    util.Cell(3, self.heroisme, center=True)
-            ]
+            util.Cell(3, self.vitalite, center=True),
+            util.Cell(3, self.heroisme, center=True)
+        ]
         if self.pouvoir.value:
             gros_titres.append(util.Cell(2, 'Pouvoir', center=True))
             gros_scores.append(util.Cell(2, self.pouvoir, center=True))
@@ -227,8 +232,9 @@ class Perso:
         for line in titres + scores + [util.HLine, gros_titres, gros_scores, util.HLine] + avantages:
             for util.Cell in line:
                 result += util.Cell.render(6)
-            result+= '\n'
+            result += '\n'
         return result + '```'
+
 
 class Attributs:
     def __init__(self):
@@ -236,6 +242,7 @@ class Attributs:
         self.agilite = util.Ref(0)
         self.esprit = util.Ref(0)
         self.aura = util.Ref(0)
+
 
 class AptitudesCombat:
     def __init__(self, attributs):
