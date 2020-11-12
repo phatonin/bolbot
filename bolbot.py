@@ -707,6 +707,28 @@ class CommandListe(Command):
         return '`liste`\nAffiche la liste des personnages que ce bot connait.'
 
 
+class CommandReload(Command):
+    def __init__(self, client):
+        Command.__init__(self, client, True)
+
+    async def get_reply(self, message):
+        if not message.content.startswith('reload'):
+            return ()
+        update_pj = False
+        update_pnj = False
+        for t in message.content[6:].split(' '):
+            t = util.snorm(t)
+            if t == 'pj':
+                update_pj = True
+            if t == 'pnj':
+                update_pnj = True
+        npj, npnj = client.load_data(update_pj, update_pnj)
+        return ('%d PJ, %d PNJ' % (npj, npnj),)
+
+    def help(self):
+        return '`reload [pj] [pnj]`\nRelit les fichiers de configuration. Si `pj` alors écrase la fiche des PJ existants. Si `pnj` alors écrase la fiche des PNJ existants.'
+
+
 class CommandAide(Command):
     def __init__(self, client):
         Command.__init__(self, client, False)
@@ -723,19 +745,32 @@ class CommandAide(Command):
 class BoLClient(discord.Client):
     def __init__(self, mj_file, pj_path, pnj_path):
         discord.Client.__init__(self)
+        self.mj_file = mj_file
+        self.pj_path = pj_path
+        self.pnj_path = pnj_path
         self.message_queue = []
         self.pj_par_userid = {}
         self.persos_par_nom = {}
-        with open(mj_file) as f:
+        self.load_data()
+        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe, CommandReload, CommandAide))
+
+    def load_data(self, update_pj=False, update_pnj=False):
+        with open(self.mj_file) as f:
             self.mj_userid = int(f.read().strip())
-        for pj, path in perso.load(pj_path):
+        npj = 0
+        for pj, path in perso.load(self.pj_path):
             pj.niveau.value = 'pj'
             userid = int(os.path.basename(path)[:-4])
-            self.pj_par_userid[userid] = pj
-            self.add_perso(pj)
-        for pnj, path in perso.load(pnj_path):
-            self.add_perso(pnj)
-        self.commands = tuple(ctor(self) for ctor in (CommandLance, CommandPurge, CommandFDP, CommandJet, CommandPerdGagne, CommandPNJ, CommandClone, CommandListe, CommandFrappe, CommandAide))
+            if userid not in self.pj_par_userid or update_pj:
+                self.pj_par_userid[userid] = pj
+                self.add_perso(pj)
+                npj += 1
+        npnj = 0
+        for pnj, path in perso.load(self.pnj_path):
+            if util.snorm(pnj.nom.value) not in self.persos_par_nom or update_pnj:
+                self.add_perso(pnj)
+                npnj += 1
+        return npj, npnj
 
     def add_perso(self, p):
         self.persos_par_nom[util.snorm(p.nom.value)] = p
