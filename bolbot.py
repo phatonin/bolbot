@@ -756,7 +756,7 @@ class BoLClient(discord.Client):
         if message.author.bot:
             return
         for cmd in self.commands:
-            contents = await cmd.auth_reply(message)
+            contents = await cmd.get_reply(message)
             if len(contents) > 0:
                 self.message_queue.append(message)
                 for content in contents:
