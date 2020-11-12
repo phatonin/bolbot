@@ -6,6 +6,14 @@ Created on Jun 2, 2020
 
 import unicodedata
 import re
+import sys
+import traceback
+
+
+def log(msg):
+    traceback.print_stack(file=sys.stderr)
+    sys.stderr.write(msg + '\n')
+    sys.stderr.flush()
 
 class Ref:
     def __init__(self, value, name=None, auto_ref=None, modifiable=False):
